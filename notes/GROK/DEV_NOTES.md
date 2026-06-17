@@ -9,7 +9,7 @@ The real work is driven by:
 
 ## Current Big Picture
 
-Greenfield Three.js port of the Metal Oceanscape simulation, seeded from `/Users/pranav/projects/oceanscape/notes/GROK`. Building a Vite + TypeScript + Three.js GPU path tracer with dielectric interface physics, volume scattering, UI controls, and GitHub Pages deployment.
+Oceanscape Web is live in code: Vite + TypeScript + Three.js GPU path tracer with dielectric interface physics (Fresnel/Snell/TIR), animated wave surface, volume god rays, rotating submerged cube, full UI controls, and temporal accumulation. Built and deployed to `gh-pages` branch. URL: https://pranavsai142.github.io/raytracing/ (enable Pages from gh-pages branch in repo settings if 404).
 
 ## Hard-Won Lessons
 
