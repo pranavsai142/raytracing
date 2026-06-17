@@ -12,48 +12,127 @@
       <div id="ui">
         <header>
           <h1>Oceanscape</h1>
-          <p class="subtitle">Accurate light transport at the water surface</p>
+          <p class="subtitle">GPU path tracer · real water-interface physics</p>
         </header>
-        <div class="controls">
-          <label>
-            Water IOR
-            <input type="range" id="ior" min="1.0" max="1.8" step="0.01" value="1.33" />
-            <span id="ior-val">1.33</span>
-          </label>
-          <label>
-            Interface Roughness
-            <input type="range" id="roughness" min="0" max="1" step="0.01" value="0.15" />
-            <span id="roughness-val">0.15</span>
-          </label>
-          <label>
-            Sun Elevation
-            <input type="range" id="sun-elev" min="0.1" max="1.5" step="0.01" value="0.8" />
-            <span id="sun-elev-val">0.8</span>
-          </label>
-          <label>
-            Sun Intensity
-            <input type="range" id="sun-int" min="0.2" max="3" step="0.05" value="1.2" />
-            <span id="sun-int-val">1.2</span>
-          </label>
-          <label>
-            Volume Density
-            <input type="range" id="volume-sigma" min="0" max="0.3" step="0.01" value="0.06" />
-            <span id="volume-sigma-val">0.06</span>
-          </label>
-          <label>
-            Samples / Pixel
-            <input type="range" id="spp" min="1" max="8" step="1" value="2" />
-            <span id="spp-val">2</span>
-          </label>
+
+        <div class="panel-scroll">
+          <section class="panel-section">
+            <h2>Render Quality</h2>
+            <label class="tip" data-tip="Path-traced samples added each frame. 1 = smoothest motion, higher = faster convergence but more noise per frame.">
+              Samples / Frame <input type="range" id="samples-per-frame" min="1" max="4" step="1" value="1" /><span id="samples-per-frame-val">1</span>
+            </label>
+            <label class="tip" data-tip="Noise reduction when camera is STILL only. While moving, each frame is fresh (no ghost trails). Lower = slower but smoother convergence.">
+              Temporal Smoothing <input type="range" id="temporal-blend" min="0.02" max="0.2" step="0.01" value="0.05" /><span id="temporal-blend-val">0.05</span>
+            </label>
+            <label class="tip" data-tip="Internal path-trace resolution scale. Lower = faster GPU, slightly softer image.">
+              Render Scale <input type="range" id="render-scale" min="0.35" max="1" step="0.05" value="0.65" /><span id="render-scale-val">0.65</span>
+            </label>
+            <label class="tip" data-tip="How many path-trace samples are added per second. Lower = smoother, less flicker. Display still runs at full FPS.">
+              Sample Rate (FPS) <input type="range" id="sample-fps" min="4" max="40" step="1" value="20" /><span id="sample-fps-val">20</span>
+            </label>
+            <label class="tip" data-tip="Max light bounces per ray. Lower = faster. TIR trapping needs ≥4 bounces.">
+              Max Bounces <input type="range" id="max-bounces" min="3" max="10" step="1" value="6" /><span id="max-bounces-val">6</span>
+            </label>
+            <label class="tip" data-tip="HDR exposure before tone mapping.">
+              Exposure <input type="range" id="exposure" min="0.5" max="3" step="0.05" value="1.35" /><span id="exposure-val">1.35</span>
+            </label>
+            <label class="tip" data-tip="Edge darkening strength.">
+              Vignette <input type="range" id="vignette" min="0" max="0.6" step="0.01" value="0.25" /><span id="vignette-val">0.25</span>
+            </label>
+          </section>
+
+          <section class="panel-section">
+            <h2>Water Physics</h2>
+            <label class="tip" data-tip="Index of refraction (air→water). 1.33 is real water. Higher = more bending & smaller Snell's window.">
+              Water IOR <input type="range" id="ior" min="1.0" max="1.8" step="0.01" value="1.33" /><span id="ior-val">1.33</span>
+            </label>
+            <label class="tip" data-tip="Microfacet roughness at the interface. 0 = mirror-smooth. Softens caustics & reflections macro TIR/Snell stay exact.">
+              Interface Roughness <input type="range" id="roughness" min="0" max="1" step="0.01" value="0.06" /><span id="roughness-val">0.06</span>
+            </label>
+            <label class="tip" data-tip="Wavelength-dependent IOR. Chromatic caustics emerge from real Snell separation — not a color filter.">
+              Spectral Dispersion <input type="range" id="dispersion" min="0" max="0.05" step="0.001" value="0.012" /><span id="dispersion-val">0.012</span>
+            </label>
+          </section>
+
+          <section class="panel-section">
+            <h2>Wave Topology</h2>
+            <label class="tip" data-tip="Wave height — surface topology tilts normals and changes when trapped light can escape (TIR escape angles).">
+              Wave Amplitude <input type="range" id="wave-amp" min="0" max="0.25" step="0.005" value="0.08" /><span id="wave-amp-val">0.08</span>
+            </label>
+            <label class="tip" data-tip="Spatial frequency of wave pattern on the water surface.">
+              Wave Frequency <input type="range" id="wave-freq" min="0.2" max="1.5" step="0.05" value="0.5" /><span id="wave-freq-val">0.5</span>
+            </label>
+            <label class="tip" data-tip="How fast wave phases scroll (before time-scale multiplier).">
+              Wave Speed <input type="range" id="wave-spd" min="0.1" max="2" step="0.05" value="0.6" /><span id="wave-spd-val">0.6</span>
+            </label>
+            <label class="tip" data-tip="Global animation speed. Lower = smoother path-trace convergence while waves move.">
+              Time Scale <input type="range" id="time-scale" min="0" max="1" step="0.01" value="0.15" /><span id="time-scale-val">0.15</span>
+            </label>
+            <label class="tip" data-tip="Toggle wave & cube animation. Off = static scene for fastest convergence.">
+              <input type="checkbox" id="animate-waves" checked /> Animate Scene
+            </label>
+          </section>
+
+          <section class="panel-section">
+            <h2>Lighting & Volume</h2>
+            <label class="tip" data-tip="Sun angle above horizon. Affects transmission energy & caustics on the cube.">
+              Sun Elevation <input type="range" id="sun-elev" min="0.1" max="1.5" step="0.01" value="0.8" /><span id="sun-elev-val">0.8</span>
+            </label>
+            <label class="tip" data-tip="Sun direction around the horizon (azimuth).">
+              Sun Azimuth <input type="range" id="sun-az" min="0" max="6.28" step="0.05" value="0.4" /><span id="sun-az-val">0.4</span>
+            </label>
+            <label class="tip" data-tip="Sun brightness multiplier in the environment map.">
+              Sun Intensity <input type="range" id="sun-int" min="0.2" max="3" step="0.05" value="1.2" /><span id="sun-int-val">1.2</span>
+            </label>
+            <label class="tip" data-tip="Participating medium density inside water. God-ray scatter along underwater paths.">
+              Volume Density <input type="range" id="volume-sigma" min="0" max="0.25" step="0.005" value="0.05" /><span id="volume-sigma-val">0.05</span>
+            </label>
+            <label class="tip" data-tip="Henyey-Greenstein asymmetry. Positive = forward scatter (sunbeams), 0 = isotropic.">
+              Volume Scatter G <input type="range" id="volume-g" min="-0.2" max="0.9" step="0.05" value="0.55" /><span id="volume-g-val">0.55</span>
+            </label>
+          </section>
+
+          <section class="panel-section">
+            <h2>Scene</h2>
+            <label class="tip" data-tip="Y position of submerged test cube. Closer to surface = stronger caustics interaction.">
+              Cube Depth <input type="range" id="cube-depth" min="-4" max="-1" step="0.1" value="-2.2" /><span id="cube-depth-val">-2.2</span>
+            </label>
+            <label class="tip" data-tip="Cube rotation speed (Y axis). Slower = less flicker during accumulation.">
+              Cube Spin Y <input type="range" id="cube-spin-y" min="0" max="0.02" step="0.001" value="0.004" /><span id="cube-spin-y-val">0.004</span>
+            </label>
+            <label class="tip" data-tip="Cube rotation speed (X axis).">
+              Cube Spin X <input type="range" id="cube-spin-x" min="0" max="0.02" step="0.001" value="0.002" /><span id="cube-spin-x-val">0.002</span>
+            </label>
+          </section>
+
+          <section class="panel-section">
+            <h2>Camera</h2>
+            <label class="tip" data-tip="Field of view in degrees.">
+              FOV <input type="range" id="fov" min="35" max="90" step="1" value="55" /><span id="fov-val">55</span>
+            </label>
+            <label class="tip" data-tip="Max WASD fly speed.">
+              Move Speed <input type="range" id="move-speed" min="0.3" max="4" step="0.1" value="1.2" /><span id="move-speed-val">1.2</span>
+            </label>
+            <label class="tip" data-tip="Acceleration when holding movement keys.">
+              Move Accel <input type="range" id="move-accel" min="1" max="12" step="0.5" value="3.5" /><span id="move-accel-val">3.5</span>
+            </label>
+            <label class="tip" data-tip="Mouse drag sensitivity for look.">
+              Mouse Sensitivity <input type="range" id="mouse-sens" min="0.0005" max="0.006" step="0.0001" value="0.0018" /><span id="mouse-sens-val">0.0018</span>
+            </label>
+          </section>
         </div>
+
         <div class="buttons">
-          <button id="view-above">Above Water</button>
-          <button id="view-below" class="active">Below Water</button>
-          <button id="auto-orbit">Auto Orbit: ON</button>
-          <button id="export-png">Export PNG</button>
+          <button id="view-above" class="tip" data-tip="Camera above the water surface looking down.">Above Water</button>
+          <button id="view-below" class="tip" data-tip="Camera below — Snell's window: sky only visible in the escape cone.">Below Water</button>
+          <button id="auto-orbit" class="tip" data-tip="Slow cinematic orbit (resets accumulation while moving).">Auto Orbit: OFF</button>
+          <button id="reset-accum" class="tip" data-tip="Clear sample buffer and restart convergence.">Reset Samples</button>
+          <button id="export-png" class="tip" data-tip="Save current frame as PNG.">Export PNG</button>
         </div>
+
         <div class="info">
-          <p>Keys: <kbd>1</kbd> above · <kbd>2</kbd> below · <kbd>Space</kbd> orbit · <kbd>X</kbd> export</p>
+          <p><strong>Move:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>Q</kbd>/<kbd>E</kbd> up/down · drag mouse to look</p>
+          <p><strong>Views:</strong> <kbd>1</kbd> above · <kbd>2</kbd> below · <kbd>O</kbd> orbit · <kbd>R</kbd> reset · <kbd>X</kbd> export</p>
           <p id="stats">Initializing...</p>
         </div>
       </div>

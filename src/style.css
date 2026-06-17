@@ -17,79 +17,152 @@ html, body, #app {
   display: block;
   width: 100%;
   height: 100%;
+  cursor: grab;
+}
+
+#canvas:active {
+  cursor: grabbing;
 }
 
 #ui {
   position: fixed;
-  top: 16px;
-  left: 16px;
-  width: 280px;
-  padding: 16px;
-  background: rgba(10, 14, 20, 0.82);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(100, 160, 220, 0.2);
+  top: 12px;
+  left: 12px;
+  width: 300px;
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  background: rgba(8, 12, 18, 0.88);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(100, 160, 220, 0.22);
   border-radius: 12px;
   z-index: 10;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 header h1 {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   color: #7ec8e8;
-  letter-spacing: 0.02em;
 }
 
 .subtitle {
-  font-size: 11px;
-  color: #8899aa;
-  margin-top: 4px;
-  margin-bottom: 12px;
+  font-size: 10px;
+  color: #7a8a9a;
+  margin: 3px 0 10px;
 }
 
-.controls label {
+.panel-scroll {
+  overflow-y: auto;
+  flex: 1;
+  margin-right: -6px;
+  padding-right: 6px;
+}
+
+.panel-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(100, 160, 220, 0.35);
+  border-radius: 3px;
+}
+
+.panel-section {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(100, 140, 180, 0.12);
+}
+
+.panel-section h2 {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #5a8aaa;
+  margin-bottom: 8px;
+}
+
+label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 12px;
+  gap: 6px;
+  margin-bottom: 6px;
   color: #b0c0d0;
+  position: relative;
 }
 
-.controls input[type="range"] {
+label input[type="range"] {
   flex: 1;
   accent-color: #4a9fd4;
+  min-width: 0;
 }
 
-.controls span {
-  min-width: 36px;
+label span {
+  min-width: 38px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: #7ec8e8;
+  font-size: 11px;
+}
+
+label input[type="checkbox"] {
+  accent-color: #4a9fd4;
+  margin-right: 4px;
+}
+
+/* Tooltips */
+.tip {
+  cursor: help;
+}
+
+.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  width: 260px;
+  padding: 8px 10px;
+  background: rgba(15, 25, 38, 0.96);
+  border: 1px solid rgba(100, 160, 220, 0.35);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #c8d8e8;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 100;
+}
+
+.tip:hover::after {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 12px 0;
+  gap: 5px;
+  margin: 10px 0 8px;
 }
 
 .buttons button {
   flex: 1 1 calc(50% - 3px);
-  padding: 8px 10px;
-  background: rgba(40, 70, 100, 0.5);
-  border: 1px solid rgba(100, 160, 220, 0.3);
+  padding: 7px 8px;
+  background: rgba(40, 70, 100, 0.45);
+  border: 1px solid rgba(100, 160, 220, 0.28);
   border-radius: 6px;
   color: #c8d8e8;
-  font-size: 11px;
+  font-size: 10px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  position: relative;
 }
 
 .buttons button:hover {
-  background: rgba(60, 100, 140, 0.6);
-  border-color: rgba(100, 180, 240, 0.5);
+  background: rgba(55, 95, 135, 0.55);
+  border-color: rgba(100, 180, 240, 0.45);
 }
 
 .buttons button.active {
@@ -99,20 +172,20 @@ header h1 {
 }
 
 .info {
-  font-size: 11px;
-  color: #667788;
-  line-height: 1.5;
+  font-size: 10px;
+  color: #6a7a8a;
+  line-height: 1.55;
 }
 
 .info kbd {
-  background: rgba(255, 255, 255, 0.08);
-  padding: 1px 5px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 1px 4px;
   border-radius: 3px;
-  font-family: inherit;
+  font-size: 9px;
 }
 
 #stats {
   margin-top: 6px;
-  color: #5a8aaa;
+  color: #5a9aba;
   font-variant-numeric: tabular-nums;
 }

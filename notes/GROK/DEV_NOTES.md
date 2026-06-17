@@ -32,7 +32,11 @@ Oceanscape Web is live in code: Vite + TypeScript + Three.js GPU path tracer wit
 
 ## Next Focus
 
-Complete implementation slices: core scene → dielectric path tracer → volume god rays → UI/polish → deploy. See latest handoff.
+**Goethe visual book** — implement P0 from requirements docs:
+- `notes/GROK/REQ-goethe-theory-of-colours.md` (GTC-00 shell, chapters I–III, V)
+- `notes/GROK/REQ-goethe-water.md` (WTR-01 neutral water, WTR-02 preset, WTR-05 diver)
+
+Source text: `THEORY_OF_COLOURS.md`. Synopses in `notes/GROK/goethe-*-synopsis.md`. See latest handoff.
 
 ---
 

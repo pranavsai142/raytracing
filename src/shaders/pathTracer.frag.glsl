@@ -4,22 +4,34 @@ varying vec2 vUv;
 
 uniform vec2 resolution;
 uniform float time;
-uniform int frame;
-uniform int samplesPerPixel;
+uniform float accumSampleCount;
+uniform float samplesPerFrame;
+uniform float maxAccumSamples;
 uniform vec3 cameraPos;
 uniform vec3 cameraTarget;
 uniform vec3 cameraUp;
 uniform float fov;
 uniform float waterIOR;
 uniform float interfaceRoughness;
+uniform float dispersion;
+uniform float maxBounces;
 uniform vec3 sunDir;
 uniform float sunIntensity;
 uniform float volumeSigma;
 uniform float volumeG;
+uniform float waveAmplitude;
+uniform float waveFrequency;
+uniform float waveSpeed;
+uniform float cubeDepth;
 uniform float cubeRotY;
 uniform float cubeRotX;
+uniform float exposure;
+uniform float vignetteStrength;
 uniform sampler2D accumTexture;
-uniform bool resetAccum;
+uniform float resetAccum;
+uniform float displayOnly;
+uniform float temporalBlend;
+uniform float cameraInteracting;
 
 // --- RNG ---
 float hash(vec2 p) {
@@ -34,12 +46,12 @@ vec2 rand2(vec2 seed) {
   return vec2(hash(seed), hash(seed + 0.1));
 }
 
-// --- Waves (multi-octave) ---
+// --- Waves: surface TOPOLOGY drives escape angles ---
 float waveHeight(vec2 p, float t) {
   float h = 0.0;
-  float amp = 0.12;
-  float freq = 0.6;
-  float spd = 1.1;
+  float amp = waveAmplitude;
+  float freq = waveFrequency;
+  float spd = waveSpeed;
   for (int i = 0; i < 4; i++) {
     float fi = float(i);
     float ang = fi * 1.3 + 0.7;
@@ -56,9 +68,9 @@ float waveHeight(vec2 p, float t) {
 vec2 waveDeriv(vec2 p, float t) {
   float dhdx = 0.0;
   float dhdz = 0.0;
-  float amp = 0.12;
-  float freq = 0.6;
-  float spd = 1.1;
+  float amp = waveAmplitude;
+  float freq = waveFrequency;
+  float spd = waveSpeed;
   for (int i = 0; i < 4; i++) {
     float fi = float(i);
     float ang = fi * 1.3 + 0.7;
@@ -80,7 +92,19 @@ vec3 waveNormal(vec2 p, float t) {
   return normalize(vec3(-d.x, 1.0, -d.y));
 }
 
-// --- Ray primitives ---
+// Spectral: wavelength-dependent IOR (emergent chromatic caustics, not faked)
+float iorAtWavelength(float lambdaNm, float baseIOR, float disp) {
+  if (disp <= 0.001) return baseIOR;
+  return baseIOR + disp * ((550.0 - lambdaNm) / 150.0);
+}
+
+vec3 spectrumWeight(float lambdaNm) {
+  float r = smoothstep(400.0, 700.0, lambdaNm);
+  float b = 1.0 - r;
+  float g = 1.0 - abs(lambdaNm - 550.0) / 200.0;
+  return vec3(r, g, b);
+}
+
 struct Ray {
   vec3 origin;
   vec3 direction;
@@ -91,23 +115,24 @@ struct HitInfo {
   float dist;
   vec3 point;
   vec3 normal;
-  int material; // 0=plane, 1=cube, 2=floor
+  int material;
 };
 
-float intersectPlane(vec3 ro, vec3 rd, out vec3 hitN, out vec2 hitXZ) {
-  float t = (-ro.y) / rd.y;
-  if (t < 0.001 || t > 200.0) return -1.0;
+// Iterative waved-surface intersection (topology matters for TIR escape)
+bool intersectWaterSurface(vec3 ro, vec3 rd, out float t, out vec3 hitN, out vec2 hitXZ) {
+  t = (-ro.y) / rd.y;
+  if (t < 0.001 || t > 200.0) return false;
+  for (int i = 0; i < 4; i++) {
+    vec3 p = ro + rd * t;
+    hitXZ = p.xz;
+    float h = waveHeight(hitXZ, time);
+    t = (h - ro.y) / rd.y;
+    if (t < 0.001) return false;
+  }
   vec3 p = ro + rd * t;
   hitXZ = p.xz;
-  float h = waveHeight(hitXZ, time);
-  float planeY = h;
-  // Refine intersection with waved surface
-  t = (planeY - ro.y) / rd.y;
-  if (t < 0.001) return -1.0;
-  p = ro + rd * t;
-  hitXZ = p.xz;
   hitN = waveNormal(hitXZ, time);
-  return t;
+  return true;
 }
 
 float intersectBox(vec3 ro, vec3 rd, vec3 boxMin, vec3 boxMax, out vec3 outN) {
@@ -137,46 +162,37 @@ float intersectFloor(vec3 ro, vec3 rd) {
   return (t > 0.001 && t < 200.0) ? t : -1.0;
 }
 
-// Rotate point around Y then X (cube animation)
 vec3 rotateCube(vec3 p) {
-  float cy = cos(cubeRotY);
-  float sy = sin(cubeRotY);
+  float cy = cos(cubeRotY); float sy = sin(cubeRotY);
   vec3 p1 = vec3(cy * p.x + sy * p.z, p.y, -sy * p.x + cy * p.z);
-  float cx = cos(cubeRotX);
-  float sx = sin(cubeRotX);
+  float cx = cos(cubeRotX); float sx = sin(cubeRotX);
   return vec3(p1.x, cx * p1.y - sx * p1.z, sx * p1.y + cx * p1.z);
 }
 
 vec3 rotateCubeInv(vec3 p) {
-  float cx = cos(-cubeRotX);
-  float sx = sin(-cubeRotX);
+  float cx = cos(-cubeRotX); float sx = sin(-cubeRotX);
   vec3 p1 = vec3(p.x, cx * p.y - sx * p.z, sx * p.y + cx * p.z);
-  float cy = cos(-cubeRotY);
-  float sy = sin(-cubeRotY);
+  float cy = cos(-cubeRotY); float sy = sin(-cubeRotY);
   return vec3(cy * p1.x + sy * p1.z, p1.y, -sy * p1.x + cy * p1.z);
-}
-
-vec3 rotateCubeDir(vec3 d) {
-  return rotateCube(d);
 }
 
 HitInfo traceScene(Ray r) {
   HitInfo info;
   info.hit = false;
-  info.dist = 1e20;
 
+  float tPlane;
   vec3 planeN;
   vec2 hitXZ;
-  float tPlane = intersectPlane(r.origin, r.direction, planeN, hitXZ);
+  bool planeHit = intersectWaterSurface(r.origin, r.direction, tPlane, planeN, hitXZ);
 
-  // Cube at y=-3, size 1.5
-  vec3 cubeCenter = vec3(0.0, -3.0, 0.0);
+  vec3 cubeCenter = vec3(0.0, cubeDepth, 0.0);
   vec3 localRo = rotateCubeInv(r.origin - cubeCenter);
   vec3 localRd = rotateCubeInv(r.direction);
   vec3 cubeN;
   float tCube = intersectBox(localRo, localRd, vec3(-0.75), vec3(0.75), cubeN);
   if (tCube > 0.0) {
-    tCube = length((rotateCube(localRo + localRd * tCube) + cubeCenter) - r.origin);
+    vec3 worldHit = rotateCube(localRo + localRd * tCube) + cubeCenter;
+    tCube = length(worldHit - r.origin);
     cubeN = rotateCube(cubeN);
   }
 
@@ -184,8 +200,7 @@ HitInfo traceScene(Ray r) {
 
   float tMin = 1e20;
   int mat = -1;
-
-  if (tPlane > 0.0 && tPlane < tMin) { tMin = tPlane; mat = 0; }
+  if (planeHit && tPlane < tMin) { tMin = tPlane; mat = 0; }
   if (tCube > 0.0 && tCube < tMin) { tMin = tCube; mat = 1; }
   if (tFloor > 0.0 && tFloor < tMin) { tMin = tFloor; mat = 2; }
 
@@ -201,7 +216,6 @@ HitInfo traceScene(Ray r) {
   return info;
 }
 
-// --- Dielectric BSDF (ported from Oceanscape Metal) ---
 vec3 refractDir(vec3 I, vec3 N, float eta) {
   float cosI = dot(-I, N);
   float sinT2 = eta * eta * (1.0 - cosI * cosI);
@@ -231,7 +245,7 @@ vec3 sampleHG(vec3 incDir, float g, vec2 ru) {
   float g2 = g * g;
   float sqrTerm = (1.0 - g2) / (1.0 - g + 2.0 * g * ru.x);
   float cosTheta = (1.0 + g2 - sqrTerm * sqrTerm) / (2.0 * g);
-  if (g < 0.001) cosTheta = 2.0 * ru.x - 1.0;
+  if (abs(g) < 0.001) cosTheta = 2.0 * ru.x - 1.0;
   float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
   float phi = 6.28318 * ru.y;
   vec3 up = abs(incDir.y) > 0.999 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
@@ -240,11 +254,17 @@ vec3 sampleHG(vec3 incDir, float g, vec2 ru) {
   return normalize(sinTheta * cos(phi) * T + sinTheta * sin(phi) * B + cosTheta * incDir);
 }
 
-vec3 envLight(vec3 dir) {
+float henyeyGreensteinPhase(float g, float cosTh) {
+  float g2 = g * g;
+  float denom = 1.0 + g2 - 2.0 * g * cosTh;
+  return (1.0 - g2) / (4.0 * 3.14159 * denom * sqrt(denom));
+}
+
+vec3 envLight(vec3 dir, float lambdaNm) {
   vec3 sky = vec3(0.45, 0.65, 0.92);
   float sunDot = max(dot(normalize(dir), normalize(sunDir)), 0.0);
   float sun = pow(sunDot, 64.0) * 4.0 * sunIntensity;
-  return sky + vec3(3.5, 3.2, 2.8) * sun;
+  return (sky + vec3(3.5, 3.2, 2.8) * sun) * spectrumWeight(lambdaNm);
 }
 
 vec3 cubeTexture(vec3 localP, vec3 localN) {
@@ -252,74 +272,103 @@ vec3 cubeTexture(vec3 localP, vec3 localN) {
   if (abs(localN.x) > 0.5) uv = localP.yz * 0.5 + 0.5;
   else if (abs(localN.y) > 0.5) uv = localP.xz * 0.5 + 0.5;
   else uv = localP.xy * 0.5 + 0.5;
-  // Checkerboard + color bands (ColorMap-like)
   float checker = mod(floor(uv.x * 8.0) + floor(uv.y * 8.0), 2.0);
-  vec3 c1 = vec3(0.85, 0.55, 0.25);
-  vec3 c2 = vec3(0.35, 0.65, 0.85);
-  return mix(c1, c2, checker);
+  return mix(vec3(0.85, 0.55, 0.25), vec3(0.35, 0.65, 0.85), checker);
 }
 
-// Tone mapping (enhanced reinhard + vignette + ocean tint)
 vec3 toneMap(vec3 hdr) {
-  hdr *= 1.35;
+  hdr *= exposure;
   vec3 mapped = hdr / (hdr + vec3(1.0));
-  mapped = mapped / (mapped + vec3(0.15)); // filmic
-  mapped = mix(mapped, mapped * vec3(0.85, 0.95, 1.05), 0.15); // ocean tint
+  mapped = mapped / (mapped + vec3(0.15));
+  mapped = mix(mapped, mapped * vec3(0.85, 0.95, 1.05), 0.15);
   return mapped;
 }
 
-vec3 pathTrace(Ray primary, vec2 seed) {
+// Volume scatter along leg — can redirect back to interface (trapped light escape)
+bool volumeScatterLeg(Ray ray, float legDist, float lambdaNm, vec2 seed, int bounce,
+                      inout vec3 throughput, inout vec3 accum, inout Ray outRay) {
+  float sigma_t = volumeSigma > 0.001 ? volumeSigma : 0.06;
+  float sigma_s = sigma_t * 0.55;
+  float g = volumeG;
+  vec3 godBeam = vec3(0.12, 0.28, 0.48) * spectrumWeight(lambdaNm);
+
+  float u = hash3(vec3(seed, float(bounce)));
+  float freePath = -log(max(u, 0.001)) / sigma_t;
+
+  if (freePath > 0.001 && freePath < legDist && sigma_s > 0.001) {
+    float atten = exp(-sigma_t * freePath);
+    throughput *= atten * (sigma_s / sigma_t);
+    vec3 scatterDir = sampleHG(ray.direction, g, rand2(seed + float(bounce + 70)));
+    float cosPh = dot(-ray.direction, scatterDir);
+    float ph = henyeyGreensteinPhase(g, cosPh);
+    accum += throughput * godBeam * ph * 0.06;
+    outRay.origin = ray.origin + ray.direction * freePath + scatterDir * 0.002;
+    outRay.direction = scatterDir;
+    return true; // continue path — may re-hit interface at escape angle
+  }
+  return false;
+}
+
+// Full multi-bounce path tracer — light traps until topology + angle allow escape
+vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
   vec3 accum = vec3(0.0);
   vec3 throughput = vec3(1.0);
   Ray ray = primary;
-  bool underwater = false;
+  float ior = iorAtWavelength(lambdaNm, waterIOR, dispersion);
+  bool inWater = cameraPos.y < 0.0; // start medium from camera position
 
-  for (int bounce = 0; bounce < 8; bounce++) {
+  int maxB = int(maxBounces + 0.5);
+  for (int bounce = 0; bounce < 12; bounce++) {
+    if (bounce >= maxB) break;
     HitInfo hit = traceScene(ray);
-    vec2 ru = rand2(seed + float(bounce) * 0.17);
+    vec2 ru = rand2(seed + float(bounce) * 17.0);
 
     if (!hit.hit) {
-      accum += throughput * envLight(ray.direction);
+      accum += throughput * envLight(ray.direction, lambdaNm);
       break;
     }
 
     vec3 I = ray.direction;
     vec3 N = hit.normal;
 
+    // Cube proxy — lit ONLY by paths that actually transmitted through interface
     if (hit.material == 1) {
-      // Cube hit — accumulate textured color
-      vec3 cubeCenter = vec3(0.0, -3.0, 0.0);
+      vec3 cubeCenter = vec3(0.0, cubeDepth, 0.0);
       vec3 localP = rotateCubeInv(hit.point - cubeCenter);
       vec3 localN = rotateCubeInv(N);
-      vec3 cubeCol = cubeTexture(localP, localN);
-      accum += throughput * cubeCol;
+      if (inWater) {
+        float sigma_t = volumeSigma > 0.001 ? volumeSigma : 0.06;
+        float att = exp(-sigma_t * hit.dist);
+        vec3 godBeam = vec3(0.12, 0.28, 0.48) * spectrumWeight(lambdaNm);
+        accum += throughput * godBeam * (1.0 - att) * 0.1;
+        throughput *= att;
+      }
+      accum += throughput * cubeTexture(localP, localN) * spectrumWeight(lambdaNm);
       break;
     }
 
     if (hit.material == 2) {
-      // Floor
-      float atten = exp(-0.12 * hit.dist);
-      accum += throughput * atten * vec3(0.05, 0.08, 0.12);
+      float att = exp(-0.12 * hit.dist);
+      accum += throughput * att * vec3(0.05, 0.08, 0.12) * spectrumWeight(lambdaNm);
       break;
     }
 
-    // Water plane — dielectric interface
+    // --- Water interface: exact dielectric port from Oceanscape Metal ---
+    // Side/eta: internal (water->air) when dot(I,N)>0; external (air->water) otherwise
     float eta;
     vec3 N_eff = N;
     if (dot(I, N) > 0.0) {
       N_eff = -N;
-      eta = waterIOR;
-      underwater = true;
+      eta = ior; // water -> air
     } else {
-      eta = 1.0 / waterIOR;
-      underwater = false;
+      eta = 1.0 / ior; // air -> water
     }
 
-    float criticalAngle = asin(1.0 / waterIOR);
+    float criticalAngle = asin(1.0 / ior);
     float cosTheta = max(dot(N_eff, -I), 0.0);
     float reflectance = schlickFresnel(cosTheta, eta);
     vec3 T = refractDir(I, N_eff, eta);
-    float theta_i = acos(cosTheta);
+    float theta_i = acos(clamp(cosTheta, 0.0, 1.0));
     bool tir = false;
     if (eta > 1.0 && theta_i > criticalAngle) tir = true;
     if (tir || length(T) < 0.001) {
@@ -329,36 +378,48 @@ vec3 pathTrace(Ray primary, vec2 seed) {
 
     vec3 N_micro = sampleMicrofacet(N_eff, interfaceRoughness, ru);
 
-    bool chooseReflect = tir || ru.x < reflectance;
+    // Stochastic Fresnel: TIR always reflects (trapped), escape only when angle < critical
+    bool chooseReflect = tir || (ru.x < reflectance);
+    vec3 nextDir;
+
+    bool fromInside = dot(I, N) > 0.0;
 
     if (chooseReflect) {
-      vec3 reflDir = I - 2.0 * dot(I, N_micro) * N_micro;
-      ray.origin = hit.point + reflDir * 0.002;
-      ray.direction = normalize(reflDir);
-      if (!tir) throughput *= reflectance / max(reflectance, 0.001);
+      nextDir = normalize(I - 2.0 * dot(I, N_micro) * N_micro);
+      // TIR: trapped inside water — bounces until wave topology tilts normal enough to escape
     } else {
-      // Transmit — volume scattering on underwater leg
-      vec3 transDir = normalize(refractDir(I, N_micro, eta));
-      float legDist = 2.0;
-      if (underwater || dot(transDir, vec3(0.0, 1.0, 0.0)) < 0.0) {
-        float sigma_t = volumeSigma > 0.001 ? volumeSigma : 0.06;
-        float sigma_s = sigma_t * 0.55;
-        float u = hash3(vec3(seed, float(bounce)));
-        float freePath = -log(max(u, 0.001)) / sigma_t;
-        if (freePath < legDist && sigma_s > 0.001) {
-          float atten = exp(-sigma_t * freePath);
-          throughput *= atten * (sigma_s / sigma_t);
-          vec3 scatterDir = sampleHG(transDir, volumeG, rand2(seed + float(bounce + 10)));
-          vec3 scatterPos = hit.point + transDir * freePath;
-          accum += throughput * vec3(0.1, 0.25, 0.4) * 0.3;
-          ray.origin = scatterPos + scatterDir * 0.002;
-          ray.direction = scatterDir;
-          continue;
-        }
+      nextDir = normalize(refractDir(I, N_micro, eta));
+      if (interfaceRoughness > 0.001) {
+        vec3 spreadAxis = normalize(cross(nextDir, vec3(0.3, 0.7, 0.4)));
+        nextDir = normalize(nextDir + spreadAxis * interfaceRoughness * 0.15 * (ru.y - 0.5));
       }
-      throughput *= (1.0 - reflectance);
-      ray.origin = hit.point + transDir * 0.002;
-      ray.direction = transDir;
+      inWater = !fromInside; // crossed the interface
+    }
+
+    // Volume scatter along underwater propagation legs (god rays + redirect back to surface)
+    if (inWater) {
+      Ray volRay;
+      float legLen = 3.0;
+      if (volumeScatterLeg(ray, legLen, lambdaNm, seed, bounce, throughput, accum, volRay)) {
+        ray = volRay;
+        continue;
+      }
+    }
+
+    // Spawn at wave-adjusted surface position (topology affects next intersection)
+    vec2 hitXZ = hit.point.xz;
+    float h = waveHeight(hitXZ, time);
+    vec3 spawnPos = vec3(hit.point.x, h, hit.point.z) + nextDir * 0.002;
+
+    ray.origin = spawnPos;
+    ray.direction = nextDir;
+
+    // Russian roulette after a few bounces (deeper trapped paths)
+    if (bounce >= 3) {
+      float lum = max(throughput.r, max(throughput.g, throughput.b));
+      float q = clamp(lum, 0.05, 0.95);
+      if (hash3(vec3(seed, float(bounce + 99))) > q) break;
+      throughput /= q;
     }
   }
 
@@ -367,9 +428,16 @@ vec3 pathTrace(Ray primary, vec2 seed) {
 
 void main() {
   vec2 uv = vUv;
-  vec2 pixel = uv * resolution;
 
-  // Camera basis
+  if (displayOnly > 0.5) {
+    vec3 accumulated = texture2D(accumTexture, uv).rgb;
+    vec2 vigUv = uv * 2.0 - 1.0;
+    accumulated *= 1.0 - dot(vigUv, vigUv) * vignetteStrength;
+    gl_FragColor = vec4(toneMap(accumulated), 1.0);
+    return;
+  }
+
+  vec2 pixel = uv * resolution;
   vec3 forward = normalize(cameraTarget - cameraPos);
   vec3 right = normalize(cross(forward, cameraUp));
   vec3 up = cross(right, forward);
@@ -377,32 +445,36 @@ void main() {
   float tanHalfFov = tan(radians(fov) * 0.5);
 
   vec3 color = vec3(0.0);
-  int spp = samplesPerPixel;
+  int spp = int(samplesPerFrame + 0.5);
 
   for (int s = 0; s < 8; s++) {
     if (s >= spp) break;
-    vec2 jitter = rand2(pixel + float(s) * 13.7 + float(frame) * 0.31);
+    vec2 jitter = rand2(pixel + float(s) * 13.7 + accumSampleCount * 0.31);
+
+    // Hero wavelength per sample — spectral dispersion from real IOR variation
+    float lambdaNm = mix(400.0, 700.0, hash(pixel + float(s) * 7.0));
+
     vec2 ndc = (pixel + jitter - 0.5) / resolution * 2.0 - 1.0;
     ndc.x *= aspect;
-
     vec3 rd = normalize(forward + right * ndc.x * tanHalfFov + up * ndc.y * tanHalfFov);
+
     Ray primary;
     primary.origin = cameraPos;
     primary.direction = rd;
-
-    color += pathTrace(primary, pixel + jitter + float(s));
+    color += pathTrace(primary, pixel + jitter + float(s), lambdaNm);
   }
-  color /= float(spp);
+  color /= max(float(spp), 1.0);
 
-  // Temporal accumulation
-  vec3 prev = resetAccum ? vec3(0.0) : texture2D(accumTexture, uv).rgb;
-  float n = resetAccum ? 1.0 : float(frame) + 1.0;
-  vec3 accumulated = (prev * (n - 1.0) + color) / n;
+  // While camera moves: show ONLY the current frame (no history = no ghost trails).
+  // When still: gentle blend to reduce noise (real photos don't leave tracers).
+  vec3 accumulated;
+  if (cameraInteracting > 0.5 || resetAccum > 0.5) {
+    accumulated = color;
+  } else {
+    vec3 prev = texture2D(accumTexture, uv).rgb;
+    float alpha = clamp(temporalBlend, 0.02, 0.2);
+    accumulated = mix(prev, color, alpha);
+  }
 
-  // Vignette
-  vec2 vigUv = uv * 2.0 - 1.0;
-  float vig = 1.0 - dot(vigUv, vigUv) * 0.25;
-  accumulated *= vig;
-
-  gl_FragColor = vec4(toneMap(accumulated), 1.0);
+  gl_FragColor = vec4(accumulated, 1.0);
 }
