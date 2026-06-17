@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Oceanscape — Light Physics Simulation</title>
+    <script type="module" crossorigin src="/raytracing/assets/index-Cr3NotmL.js"></script>
+    <link rel="stylesheet" crossorigin href="/raytracing/assets/index-n3lRZPQJ.css">
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="canvas"></canvas>
+      <div id="ui">
+        <header>
+          <h1>Oceanscape</h1>
+          <p class="subtitle">Accurate light transport at the water surface</p>
+        </header>
+        <div class="controls">
+          <label>
+            Water IOR
+            <input type="range" id="ior" min="1.0" max="1.8" step="0.01" value="1.33" />
+            <span id="ior-val">1.33</span>
+          </label>
+          <label>
+            Interface Roughness
+            <input type="range" id="roughness" min="0" max="1" step="0.01" value="0.15" />
+            <span id="roughness-val">0.15</span>
+          </label>
+          <label>
+            Sun Elevation
+            <input type="range" id="sun-elev" min="0.1" max="1.5" step="0.01" value="0.8" />
+            <span id="sun-elev-val">0.8</span>
+          </label>
+          <label>
+            Sun Intensity
+            <input type="range" id="sun-int" min="0.2" max="3" step="0.05" value="1.2" />
+            <span id="sun-int-val">1.2</span>
+          </label>
+          <label>
+            Volume Density
+            <input type="range" id="volume-sigma" min="0" max="0.3" step="0.01" value="0.06" />
+            <span id="volume-sigma-val">0.06</span>
+          </label>
+          <label>
+            Samples / Pixel
+            <input type="range" id="spp" min="1" max="8" step="1" value="2" />
+            <span id="spp-val">2</span>
+          </label>
+        </div>
+        <div class="buttons">
+          <button id="view-above">Above Water</button>
+          <button id="view-below" class="active">Below Water</button>
+          <button id="auto-orbit">Auto Orbit: ON</button>
+          <button id="export-png">Export PNG</button>
+        </div>
+        <div class="info">
+          <p>Keys: <kbd>1</kbd> above · <kbd>2</kbd> below · <kbd>Space</kbd> orbit · <kbd>X</kbd> export</p>
+          <p id="stats">Initializing...</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
