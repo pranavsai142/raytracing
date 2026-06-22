@@ -13,6 +13,11 @@ Use this document to restart autonomous execution if a session ends before all w
 | Path tracer | DONE | 8-bounce stochastic PT |
 | Volume god rays | DONE | HG scatter on trans legs |
 | UI/Polish | DONE | Sliders, orbit, export, tone map |
+| QoL + tooltips | DONE | All params exposed, `data-tip` on every control |
+| Camera controls | DONE | WASD/Q/E + mouse drag, accel/damping (`cameraControls.ts`) |
+| Anti-ghosting accum | DONE | No temporal blend during camera motion; reset on move |
+| Spectral dispersion | DONE | Hero-wavelength IOR variation in shader |
+| Goethe chapter shell | IN PROGRESS | `chapters.ts`, presets, UI — **uncommitted** |
 | Build | DONE | `npm run build` passes |
 | Deploy | PARTIAL | gh-pages branch pushed; enable Pages in repo settings OR wait for Actions workflow |
 
@@ -20,10 +25,12 @@ Use this document to restart autonomous execution if a session ends before all w
 
 ```
 /init then continue Oceanscape Web per notes/GROK/REBOOT.md:
-1. Verify https://pranavsai142.github.io/raytracing/ loads (if 404: check GitHub repo Settings → Pages → source = gh-pages branch OR GitHub Actions)
-2. Run npm run build && npm run preview — confirm path tracer renders
-3. /sequential-implement slice 5: MIS/unbiased, spectral dispersion, live volume UI sliders
-4. /done
+1. Read notes/GROK/handoffs/2026-06-16-qol-camera-accum-fix-handoff.md
+2. Commit uncommitted Goethe + QoL work
+3. Visual-verify chapter presets vs REQ-goethe-*.md acceptance criteria
+4. Close P0 gaps: chapter quote tooltips, diver physiological toggle, mobile HalfFloat
+5. Optional: MIS/unbiased estimator, enable GitHub Pages if 404
+6. /done
 ```
 
 ## Verification Gates
@@ -38,25 +45,26 @@ npm run preview        # must serve at localhost:4173/raytracing/
 Visual checks:
 - Below-water view shows Snell's window (sky cone, TIR ring)
 - Cube visible inside transmission window only
-- Auto-orbit cycles camera
-- Sliders reset accumulation and change physics live
+- WASD/mouse move: no ghost trails between old/new viewpoints
+- Hold still: image sharpens progressively (sample counter climbs)
+- Goethe chapter buttons switch presets; badge updates
 - Export PNG downloads image
 
 ## Files to Read First
 
 1. `notes/GROK/SOUL_DRIVER.md`
-2. `notes/GROK/handoffs/2026-06-16-oceanscape-web-threejs-deploy-handoff.md`
-3. `src/shaders/pathTracer.frag.glsl` (physics core)
-4. `/Users/pranav/projects/oceanscape/notes/GROK/` (Metal reference)
+2. `notes/GROK/handoffs/2026-06-16-qol-camera-accum-fix-handoff.md`
+3. `notes/GROK/REQ-goethe-theory-of-colours.md` + `REQ-goethe-water.md`
+4. `src/shaders/pathTracer.frag.glsl` (physics core)
 
 ## Remaining Work (Slice 5+)
 
-From Metal Oceanscape Prospect Brief:
+- Commit + verify Goethe P0 presets
+- Per-chapter quote tooltips on chapter buttons (REQ GTC-00)
+- `diver-view` physiological toggle wiring
 - MIS / unbiased path sampling
-- Wavelength-dependent IOR (spectral dispersion / chromatic caustics)
-- Live volumeSigma/volumeG UI sliders (currently hardcoded)
 - Golden frame regression harness (web equivalent of Metal headless capture)
-- Mobile Float texture fallback (HalfFloat)
+- Mobile HalfFloat accum verification
 
 ## Loop Protocol
 

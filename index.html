@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Oceanscape — Light Physics Simulation</title>
+    <title>Oceanscape — Goethe Theory of Colours</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -12,10 +12,36 @@
       <div id="ui">
         <header>
           <h1>Oceanscape</h1>
-          <p class="subtitle">GPU path tracer · real water-interface physics</p>
+          <p class="subtitle">Goethe saw them — interactive visual book</p>
+          <div id="chapter-badge" class="chapter-badge badge-physical">PHYSICAL</div>
+          <p id="chapter-caption" class="chapter-caption">Dielectric interface path tracer</p>
         </header>
 
         <div class="panel-scroll">
+          <section class="panel-section goethe-section">
+            <h2>Goethe Chapters</h2>
+            <div class="chapter-grid">
+              <button class="chapter-btn" data-chapter="ocean">Ocean</button>
+              <button class="chapter-btn" data-chapter="primordial" title="§175">I Primordial</button>
+              <button class="chapter-btn" data-chapter="atmosphere" title="§155">II Atmosphere</button>
+              <button class="chapter-btn" data-chapter="shadows" title="§76">III Shadows</button>
+              <button class="chapter-btn" data-chapter="shadows-underwater" title="§78">III Underwater</button>
+              <button class="chapter-btn" data-chapter="contrast" title="§56">IV Contrast</button>
+              <button class="chapter-btn" data-chapter="refraction" title="§227">V Refraction</button>
+              <button class="chapter-btn" data-chapter="double-reflect" title="§224">VI Double</button>
+              <button class="chapter-btn" data-chapter="afterimage" title="§50">VII After</button>
+              <button class="chapter-btn" data-chapter="twilight" title="§85">VIII Twilight</button>
+            </div>
+            <h3 class="subsection">Water Phenomena</h3>
+            <div class="chapter-grid">
+              <button class="chapter-btn water-btn" data-chapter="goethe-colourless-water" title="§161">No Colour</button>
+              <button class="chapter-btn water-btn" data-chapter="diver-view" title="§78">Diver</button>
+              <button class="chapter-btn water-btn" data-chapter="vessel-elevation" title="§187">Vessel</button>
+              <button class="chapter-btn water-btn" data-chapter="wave-contrast" title="§57">Agitated</button>
+              <button class="chapter-btn water-btn" data-chapter="twilight-ocean" title="§75">Twilight</button>
+              <button class="chapter-btn water-btn" data-chapter="sun-glitter" title="§93">Glitter</button>
+            </div>
+          </section>
           <section class="panel-section">
             <h2>Render Quality</h2>
             <label class="tip" data-tip="Path-traced samples added each frame. 1 = smoothest motion, higher = faster convergence but more noise per frame.">
@@ -90,6 +116,42 @@
             <label class="tip" data-tip="Henyey-Greenstein asymmetry. Positive = forward scatter (sunbeams), 0 = isotropic.">
               Volume Scatter G <input type="range" id="volume-g" min="-0.2" max="0.9" step="0.05" value="0.55" /><span id="volume-g-val">0.55</span>
             </label>
+            <label class="tip" data-tip="Goethe §161: semi-opacity, not water colour. Thickness changes lit/dark relations.">
+              Semi-opacity (Turbidity) <input type="range" id="turbidity" min="0" max="1" step="0.01" value="0.05" /><span id="turbidity-val">0.05</span>
+            </label>
+            <label class="tip" data-tip="Beer = modern λ absorption (red at depth). Goethe = warm bright-path shift. Neutral = scalar only.">
+              Absorption Model
+              <select id="absorption-model">
+                <option value="neutral">Neutral</option>
+                <option value="beer">Beer (modern)</option>
+                <option value="goethe">Goethe semi-opacity</option>
+              </select>
+            </label>
+            <label class="tip" data-tip="God-ray tint. White (1,1,1) = colourless medium. Blue only for §151 darkness-through-medium demos.">
+              Scatter R <input type="range" id="scatter-r" min="0" max="1" step="0.05" value="1" />
+              G <input type="range" id="scatter-g" min="0" max="1" step="0.05" value="1" />
+              B <input type="range" id="scatter-b" min="0" max="1" step="0.05" value="1" />
+            </label>
+            <label class="tip" data-tip="§175: light + darkness through colourless medium thickness.">
+              Medium Thickness <input type="range" id="medium-thickness" min="0" max="1" step="0.05" value="0.3" /><span id="medium-thickness-val">0.3</span>
+            </label>
+            <label class="tip" data-tip="Rayleigh-style sky density. Zenith blue deepens as sun lowers.">
+              Atmosphere Density <input type="range" id="atmosphere-density" min="0" max="2" step="0.05" value="0.5" /><span id="atmosphere-density-val">0.5</span>
+            </label>
+            <label class="tip" data-tip="Contrary fill light for coloured shadows (§76).">
+              Fill Intensity <input type="range" id="fill-intensity" min="0" max="1" step="0.05" value="0.35" /><span id="fill-intensity-val">0.35</span>
+            </label>
+            <label class="tip" data-tip="§78 physiological: green shadow boost. Labeled post-process, not water pigment.">
+              Complement Strength <input type="range" id="complement-strength" min="0" max="1" step="0.05" value="0" /><span id="complement-strength-val">0</span>
+            </label>
+            <label class="tip" data-tip="§75–76: sunset → sea-green shadows → grey twilight → moon.">
+              Time of Day <input type="range" id="time-of-day" min="0" max="1" step="0.01" value="0.5" /><span id="time-of-day-val">0.5</span>
+            </label>
+            <label class="tip" data-tip="§163 chemical tint experiment — not default ocean colour.">
+              Volume Tint R <input type="range" id="volume-tint-r" min="0.5" max="1.5" step="0.05" value="1" />
+              G <input type="range" id="volume-tint-g" min="0.5" max="1.5" step="0.05" value="1" />
+              B <input type="range" id="volume-tint-b" min="0.5" max="1.5" step="0.05" value="1" />
+            </label>
           </section>
 
           <section class="panel-section">
@@ -133,6 +195,7 @@
         <div class="info">
           <p><strong>Move:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>Q</kbd>/<kbd>E</kbd> up/down · drag mouse to look</p>
           <p><strong>Views:</strong> <kbd>1</kbd> above · <kbd>2</kbd> below · <kbd>O</kbd> orbit · <kbd>R</kbd> reset · <kbd>X</kbd> export</p>
+          <p><strong>Chapters:</strong> <kbd>1</kbd>–<kbd>8</kbd> Goethe I–VIII · hash <code>#chapter=refraction</code></p>
           <p id="stats">Initializing...</p>
         </div>
       </div>

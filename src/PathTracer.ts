@@ -1,6 +1,9 @@
 import * as THREE from 'three';
+import { chapterById, type ChapterBadge, type ChapterId } from './chapters';
 import vertShader from './shaders/pathTracer.vert.glsl?raw';
 import fragShader from './shaders/pathTracer.frag.glsl?raw';
+
+export type AbsorptionModel = 'neutral' | 'beer' | 'goethe';
 
 export interface SimParams {
   waterIOR: number;
@@ -34,6 +37,34 @@ export interface SimParams {
   sampleFps: number;
   underwaterView: boolean;
   autoOrbit: boolean;
+  // Goethe extensions
+  turbidity: number;
+  scatterTint: [number, number, number];
+  absorptionModel: AbsorptionModel;
+  sigmaLambda: [number, number, number];
+  volumeTint: [number, number, number];
+  atmosphereDensity: number;
+  mediumThickness: number;
+  mediumTint: [number, number, number];
+  fillDir: [number, number, number];
+  fillIntensity: number;
+  fillTint: [number, number, number];
+  sceneMode: number;
+  activeChapter: ChapterId;
+  physiologicalContrast: boolean;
+  opponentStrength: number;
+  complementStrength: number;
+  secondaryReflectWeight: number;
+  floorReflectance: number;
+  flameEdgeBoost: number;
+  moonElevation: number;
+  moonAzimuth: number;
+  moonIntensity: number;
+  candleIntensity: number;
+  timeOfDay: number;
+  bloomStrength: number;
+  fixationMode: boolean;
+  afterimageDecay: number;
 }
 
 function pickAccumType(renderer: THREE.WebGLRenderer): THREE.TextureDataType {
@@ -54,6 +85,8 @@ function createAccumTarget(w: number, h: number, type: THREE.TextureDataType): T
     stencilBuffer: false,
   });
 }
+
+const ABSORPTION_MAP: Record<AbsorptionModel, number> = { neutral: 0, beer: 1, goethe: 2 };
 
 export class PathTracer {
   private renderer: THREE.WebGLRenderer;
@@ -77,10 +110,11 @@ export class PathTracer {
   private simTime = 0;
   private cubeRotY = 0;
   private cubeRotX = 0;
-  private sceneVersion = 0;
+  private fixationHold = 0;
 
   preRender: ((dt: number) => void) | null = null;
   onCameraMoved: (() => void) | null = null;
+  onChapterChanged: ((id: ChapterId, badge: ChapterBadge) => void) | null = null;
 
   params: SimParams = {
     waterIOR: 1.33,
@@ -114,6 +148,33 @@ export class PathTracer {
     sampleFps: 20,
     underwaterView: true,
     autoOrbit: false,
+    turbidity: 0.05,
+    scatterTint: [1, 1, 1],
+    absorptionModel: 'neutral',
+    sigmaLambda: [0.04, 0.08, 0.18],
+    volumeTint: [1, 1, 1],
+    atmosphereDensity: 0.5,
+    mediumThickness: 0.3,
+    mediumTint: [1, 1, 1],
+    fillDir: [-0.4, 0.6, -0.3],
+    fillIntensity: 0.35,
+    fillTint: [0.7, 0.85, 1.0],
+    sceneMode: 0,
+    activeChapter: 'ocean',
+    physiologicalContrast: false,
+    opponentStrength: 0.4,
+    complementStrength: 0,
+    secondaryReflectWeight: 0,
+    floorReflectance: 0.15,
+    flameEdgeBoost: 0,
+    moonElevation: -0.15,
+    moonAzimuth: 2.5,
+    moonIntensity: 0,
+    candleIntensity: 0,
+    timeOfDay: 0.5,
+    bloomStrength: 0,
+    fixationMode: false,
+    afterimageDecay: 0.02,
   };
 
   cameraPos = new THREE.Vector3(0, -1.2, 3.5);
@@ -161,10 +222,230 @@ export class PathTracer {
     this.applyRenderScale();
     this.lastCamPos.copy(this.cameraPos);
     this.lastCamTarget.copy(this.cameraTarget);
+
+    const hash = window.location.hash.replace('#chapter=', '');
+    if (hash && chapterById(hash)) {
+      this.applyChapterPreset(hash as ChapterId, false);
+    }
   }
 
   setUserInteracting(active: boolean): void {
     this.userInteracting = active;
+  }
+
+  getChapterBadge(): ChapterBadge {
+    return chapterById(this.params.activeChapter)?.badge ?? 'PHYSICAL';
+  }
+
+  applyChapterPreset(id: ChapterId, updateHash = true): void {
+    const def = chapterById(id);
+    if (!def) return;
+
+    this.params.activeChapter = id;
+    this.params.sceneMode = def.sceneMode;
+    this.params.autoOrbit = false;
+    this.params.physiologicalContrast = false;
+    this.params.complementStrength = 0;
+    this.params.fixationMode = false;
+    this.params.bloomStrength = 0;
+    this.params.flameEdgeBoost = 0;
+    this.params.moonIntensity = 0;
+    this.params.candleIntensity = 0;
+    this.params.secondaryReflectWeight = 0;
+
+    switch (id) {
+      case 'ocean':
+        this.params.underwaterView = true;
+        this.cameraPos.set(0, -1.2, 3.5);
+        this.updateCameraTargetFromAngles(0, -0.15);
+        break;
+
+      case 'primordial':
+        this.params.sunElevation = 0.12;
+        this.params.mediumThickness = 0.6;
+        this.params.atmosphereDensity = 1.0;
+        this.params.volumeSigma = 0.04;
+        this.params.turbidity = 0.4;
+        this.params.underwaterView = false;
+        this.cameraPos.set(0, 2.5, 5);
+        this.updateCameraTargetFromAngles(0, -0.25);
+        break;
+
+      case 'atmosphere':
+        this.params.atmosphereDensity = 1.2;
+        this.params.sunElevation = 0.35;
+        this.params.autoOrbit = true;
+        this.params.flameEdgeBoost = 0.6;
+        this.params.underwaterView = false;
+        this.cameraPos.set(0, 2.5, 5);
+        this.updateCameraTargetFromAngles(0, -0.3);
+        break;
+
+      case 'shadows':
+        this.params.sunElevation = 0.15;
+        this.params.sunIntensity = 1.4;
+        this.params.fillIntensity = 0.5;
+        this.params.fillTint = [0.7, 0.85, 1.0];
+        this.params.exposure = 1.8;
+        this.params.underwaterView = false;
+        this.cameraPos.set(1.2, 2.0, 3);
+        this.updateCameraTargetFromAngles(-0.5, -0.5);
+        break;
+
+      case 'shadows-underwater':
+        this.params.sunElevation = 0.15;
+        this.params.fillIntensity = 0.45;
+        this.params.fillTint = [0.7, 0.85, 1.0];
+        this.params.volumeSigma = 0.08;
+        this.params.complementStrength = 0.25;
+        this.params.underwaterView = true;
+        this.cameraPos.set(0.5, -1.0, 3);
+        this.updateCameraTargetFromAngles(0, -0.2);
+        break;
+
+      case 'contrast':
+        this.params.physiologicalContrast = true;
+        this.params.opponentStrength = 0.5;
+        this.params.dispersion = 0.03;
+        this.params.underwaterView = false;
+        this.cameraPos.set(0, 2.2, 2.5);
+        this.updateCameraTargetFromAngles(0, -0.55);
+        break;
+
+      case 'refraction':
+        this.params.dispersion = 0.02;
+        this.params.interfaceRoughness = 0.02;
+        this.params.maxBounces = 8;
+        this.params.waveAmplitude = 0.06;
+        this.params.underwaterView = true;
+        this.cameraPos.set(0, -0.3, 2.5);
+        this.updateCameraTargetFromAngles(0, -0.4);
+        break;
+
+      case 'double-reflect':
+        this.params.waveAmplitude = 0;
+        this.params.secondaryReflectWeight = 0.4;
+        this.params.floorReflectance = 0.2;
+        this.params.underwaterView = false;
+        this.cameraPos.set(0, 1.5, 4);
+        this.updateCameraTargetFromAngles(0, -0.35);
+        break;
+
+      case 'afterimage':
+        this.params.fixationMode = true;
+        this.params.underwaterView = false;
+        this.cameraPos.set(0, 1.8, 3);
+        this.updateCameraTargetFromAngles(0, -0.2);
+        break;
+
+      case 'twilight':
+        this.params.sunElevation = 0.06;
+        this.params.sunIntensity = 0.15;
+        this.params.exposure = 2.2;
+        this.params.fillIntensity = 0.4;
+        this.params.moonIntensity = 0.25;
+        this.params.candleIntensity = 0.6;
+        this.params.complementStrength = 0.3;
+        this.params.underwaterView = false;
+        this.cameraPos.set(0, 1.2, 4);
+        this.updateCameraTargetFromAngles(0, -0.2);
+        break;
+
+      case 'goethe-colourless-water':
+        this.params.volumeSigma = 0.01;
+        this.params.turbidity = 0.01;
+        this.params.scatterTint = [1, 1, 1];
+        this.params.absorptionModel = 'neutral';
+        this.params.dispersion = 0.008;
+        this.params.sunElevation = 0.7;
+        this.params.waveAmplitude = 0.02;
+        this.params.cubeDepth = -2.2;
+        this.params.exposure = 1.2;
+        this.params.underwaterView = false;
+        this.cameraPos.set(0, 2.5, 5);
+        this.updateCameraTargetFromAngles(0, -0.3);
+        break;
+
+      case 'diver-view':
+        this.params.underwaterView = true;
+        this.params.sunElevation = 0.85;
+        this.params.absorptionModel = 'beer';
+        this.params.turbidity = 0.1;
+        this.params.volumeSigma = 0.08;
+        this.params.fillIntensity = 0.4;
+        this.params.complementStrength = 0.35;
+        this.cameraPos.set(0, -1.2, 3);
+        this.updateCameraTargetFromAngles(0, -0.12);
+        break;
+
+      case 'vessel-elevation':
+        this.params.volumeSigma = 0.005;
+        this.params.turbidity = 0.005;
+        this.params.scatterTint = [1, 1, 1];
+        this.params.cubeDepth = -1.5;
+        this.params.underwaterView = false;
+        this.cameraPos.set(0, 3, 2.5);
+        this.updateCameraTargetFromAngles(0, -0.7);
+        break;
+
+      case 'wave-contrast':
+        this.params.underwaterView = false;
+        this.params.sunElevation = 0.2;
+        this.params.waveAmplitude = 0.12;
+        this.params.interfaceRoughness = 0.02;
+        this.params.complementStrength = 0.3;
+        this.cameraPos.set(0, 0.5, 5);
+        this.updateCameraTargetFromAngles(0, 0.1);
+        break;
+
+      case 'twilight-ocean':
+        this.params.timeOfDay = 0.35;
+        this.params.complementStrength = 0.35;
+        this.applyTimeOfDay(0.35);
+        this.params.underwaterView = false;
+        this.cameraPos.set(0, 1.0, 5);
+        this.updateCameraTargetFromAngles(0, -0.15);
+        break;
+
+      case 'sun-glitter':
+        this.params.sunElevation = 0.05;
+        this.params.waveAmplitude = 0.1;
+        this.params.bloomStrength = 0.4;
+        this.params.underwaterView = false;
+        this.cameraPos.set(0, 0.8, 6);
+        this.updateCameraTargetFromAngles(0, 0.05);
+        break;
+    }
+
+    if (updateHash) {
+      window.location.hash = `chapter=${id}`;
+    }
+
+    this.onChapterChanged?.(id, def.badge);
+    this.markSceneChanged();
+  }
+
+  applyTimeOfDay(t: number): void {
+    this.params.timeOfDay = t;
+    if (t < 0.25) {
+      this.params.sunElevation = 0.05;
+      this.params.sunIntensity = 1.0;
+      this.params.moonIntensity = 0;
+    } else if (t < 0.45) {
+      this.params.sunElevation = 0.08;
+      this.params.sunIntensity = 0.6;
+      this.params.moonIntensity = 0;
+      this.params.complementStrength = Math.max(this.params.complementStrength, 0.3);
+    } else if (t < 0.65) {
+      this.params.sunElevation = -0.02;
+      this.params.sunIntensity = 0.15;
+      this.params.moonIntensity = 0.05;
+    } else {
+      this.params.sunElevation = -0.2;
+      this.params.sunIntensity = 0.04;
+      this.params.moonIntensity = 0.3;
+      this.params.candleIntensity = 0.4;
+    }
   }
 
   private clearAccumBuffers(): void {
@@ -219,6 +500,29 @@ export class PathTracer {
       displayOnly: { value: 0.0 },
       temporalBlend: { value: 0.05 },
       cameraInteracting: { value: 0.0 },
+      turbidity: { value: 0.05 },
+      scatterTint: { value: new THREE.Vector3(1, 1, 1) },
+      absorptionModel: { value: 0 },
+      sigmaLambda: { value: new THREE.Vector3(0.04, 0.08, 0.18) },
+      volumeTint: { value: new THREE.Vector3(1, 1, 1) },
+      atmosphereDensity: { value: 0.5 },
+      mediumThickness: { value: 0.3 },
+      mediumTint: { value: new THREE.Vector3(1, 1, 1) },
+      fillDir: { value: new THREE.Vector3(-0.4, 0.6, -0.3) },
+      fillIntensity: { value: 0.35 },
+      fillTint: { value: new THREE.Vector3(0.7, 0.85, 1.0) },
+      sceneMode: { value: 0 },
+      physiologicalContrast: { value: 0.0 },
+      opponentStrength: { value: 0.4 },
+      complementStrength: { value: 0.0 },
+      secondaryReflectWeight: { value: 0.0 },
+      floorReflectance: { value: 0.15 },
+      flameEdgeBoost: { value: 0.0 },
+      moonDir: { value: new THREE.Vector3() },
+      moonIntensity: { value: 0.0 },
+      candleIntensity: { value: 0.0 },
+      bloomStrength: { value: 0.0 },
+      fixationStrength: { value: 0.0 },
     };
   }
 
@@ -251,7 +555,6 @@ export class PathTracer {
   }
 
   markSceneChanged(): void {
-    this.sceneVersion++;
     this.clearAccumBuffers();
     this.accumSampleCount = 0;
     this.needsReset = true;
@@ -272,11 +575,7 @@ export class PathTracer {
 
   updateCameraTargetFromAngles(yaw: number, pitch: number): void {
     const cp = Math.cos(pitch);
-    const dir = new THREE.Vector3(
-      Math.sin(yaw) * cp,
-      Math.sin(pitch),
-      Math.cos(yaw) * cp,
-    );
+    const dir = new THREE.Vector3(Math.sin(yaw) * cp, Math.sin(pitch), Math.cos(yaw) * cp);
     this.cameraTarget.copy(this.cameraPos).add(dir);
   }
 
@@ -305,6 +604,10 @@ export class PathTracer {
     const yaw = this.orbitPhase + Math.PI;
     const pitch = this.params.underwaterView ? -0.12 : -0.28;
     this.updateCameraTargetFromAngles(yaw, pitch);
+
+    if (this.params.activeChapter === 'atmosphere') {
+      this.params.sunElevation = 0.05 + (Math.sin(this.orbitPhase * 0.3) * 0.5 + 0.5) * 0.85;
+    }
   }
 
   private advanceSimulation(dt: number): void {
@@ -313,6 +616,12 @@ export class PathTracer {
     }
     this.cubeRotY += this.params.cubeRotSpeedY;
     this.cubeRotX += this.params.cubeRotSpeedX;
+
+    if (this.params.fixationMode) {
+      this.fixationHold = Math.min(10, this.fixationHold + dt);
+    } else {
+      this.fixationHold = Math.max(0, this.fixationHold - dt * this.params.afterimageDecay * 2);
+    }
   }
 
   private updateUniforms(): void {
@@ -320,6 +629,10 @@ export class PathTracer {
     const sunX = Math.cos(this.params.sunAzimuth) * Math.cos(this.params.sunElevation);
     const sunY = Math.sin(this.params.sunElevation);
     const sunZ = Math.sin(this.params.sunAzimuth) * Math.cos(this.params.sunElevation);
+
+    const moonX = Math.cos(this.params.moonAzimuth) * Math.cos(this.params.moonElevation);
+    const moonY = Math.sin(this.params.moonElevation);
+    const moonZ = Math.sin(this.params.moonAzimuth) * Math.cos(this.params.moonElevation);
 
     u.time.value = this.simTime;
     u.accumSampleCount.value = this.accumSampleCount;
@@ -346,6 +659,30 @@ export class PathTracer {
     u.volumeG.value = this.params.volumeG;
     u.cubeRotY.value = this.cubeRotY;
     u.cubeRotX.value = this.cubeRotX;
+
+    u.turbidity.value = this.params.turbidity;
+    u.scatterTint.value.set(...this.params.scatterTint);
+    u.absorptionModel.value = ABSORPTION_MAP[this.params.absorptionModel];
+    u.sigmaLambda.value.set(...this.params.sigmaLambda);
+    u.volumeTint.value.set(...this.params.volumeTint);
+    u.atmosphereDensity.value = this.params.atmosphereDensity;
+    u.mediumThickness.value = this.params.mediumThickness;
+    u.mediumTint.value.set(...this.params.mediumTint);
+    u.fillDir.value.set(...this.params.fillDir).normalize();
+    u.fillIntensity.value = this.params.fillIntensity;
+    u.fillTint.value.set(...this.params.fillTint);
+    u.sceneMode.value = this.params.sceneMode;
+    u.physiologicalContrast.value = this.params.physiologicalContrast ? 1.0 : 0.0;
+    u.opponentStrength.value = this.params.opponentStrength;
+    u.complementStrength.value = this.params.complementStrength;
+    u.secondaryReflectWeight.value = this.params.secondaryReflectWeight;
+    u.floorReflectance.value = this.params.floorReflectance;
+    u.flameEdgeBoost.value = this.params.flameEdgeBoost;
+    u.moonDir.value.set(moonX, moonY, moonZ);
+    u.moonIntensity.value = this.params.moonIntensity;
+    u.candleIntensity.value = this.params.candleIntensity;
+    u.bloomStrength.value = this.params.bloomStrength;
+    u.fixationStrength.value = this.params.fixationMode ? Math.min(1, this.fixationHold / 5) : 0;
   }
 
   render(): void {
@@ -391,13 +728,10 @@ export class PathTracer {
     const readIdx = this.ping;
     const writeIdx = 1 - this.ping;
     const sampleInterval = 1000 / Math.max(1, this.params.sampleFps);
-    const shouldSample =
-      interacting || now - this.lastSampleTime >= sampleInterval;
+    const shouldSample = interacting || now - this.lastSampleTime >= sampleInterval;
 
     if (shouldSample) {
-      u.accumTexture.value = interacting
-        ? this.accumTargets[readIdx].texture
-        : this.accumTargets[readIdx].texture;
+      u.accumTexture.value = this.accumTargets[readIdx].texture;
       u.displayOnly.value = 0.0;
       if (interacting) u.resetAccum.value = 1.0;
 
@@ -434,7 +768,8 @@ export class PathTracer {
   getStats(): string {
     const pct = Math.min(100, Math.round((this.accumSampleCount / this.params.maxAccumSamples) * 100));
     const { w, h } = this.renderSize();
-    return `Samples ${this.accumSampleCount}/${this.params.maxAccumSamples} (${pct}%) · ${w}×${h} PT`;
+    const ch = this.params.activeChapter;
+    return `Samples ${this.accumSampleCount}/${this.params.maxAccumSamples} (${pct}%) · ${w}×${h} · ${ch}`;
   }
 
   getGpuInfo(): string {

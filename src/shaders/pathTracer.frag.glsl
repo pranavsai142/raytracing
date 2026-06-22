@@ -32,6 +32,29 @@ uniform float resetAccum;
 uniform float displayOnly;
 uniform float temporalBlend;
 uniform float cameraInteracting;
+uniform float turbidity;
+uniform vec3 scatterTint;
+uniform int absorptionModel;
+uniform vec3 sigmaLambda;
+uniform vec3 volumeTint;
+uniform float atmosphereDensity;
+uniform float mediumThickness;
+uniform vec3 mediumTint;
+uniform vec3 fillDir;
+uniform float fillIntensity;
+uniform vec3 fillTint;
+uniform int sceneMode;
+uniform float physiologicalContrast;
+uniform float opponentStrength;
+uniform float complementStrength;
+uniform float secondaryReflectWeight;
+uniform float floorReflectance;
+uniform float flameEdgeBoost;
+uniform vec3 moonDir;
+uniform float moonIntensity;
+uniform float candleIntensity;
+uniform float bloomStrength;
+uniform float fixationStrength;
 
 // --- RNG ---
 float hash(vec2 p) {
@@ -156,10 +179,63 @@ float intersectBox(vec3 ro, vec3 rd, vec3 boxMin, vec3 boxMax, out vec3 outN) {
   return t;
 }
 
+float intersectRod(vec3 ro, vec3 rd) {
+  if (sceneMode < 3) return -1.0;
+  vec3 rodC = vec3(0.5, -4.8, 0.0);
+  float r = 0.03;
+  vec3 oc = ro - rodC;
+  float b = dot(oc, rd);
+  float c = dot(oc, oc) - r * r;
+  float disc = b * b - c;
+  if (disc < 0.0) return -1.0;
+  float s = sqrt(disc);
+  float t0 = -b - s;
+  float t1 = -b + s;
+  float t = t0 > 0.001 ? t0 : t1;
+  if (t < 0.001 || t > 200.0) return -1.0;
+  vec3 p = ro + rd * t;
+  if (p.y < -5.8 || p.y > -3.8) return -1.0;
+  return t;
+}
+
+float intersectGreyPlane(vec3 ro, vec3 rd) {
+  if (sceneMode != 7 || rd.y >= -0.001) return -1.0;
+  float t = (1.5 - ro.y) / rd.y;
+  if (t < 0.001 || t > 200.0) return -1.0;
+  vec3 p = ro + rd * t;
+  if (abs(p.x) > 4.0 || abs(p.z) > 4.0) return -1.0;
+  return t;
+}
+
 float intersectFloor(vec3 ro, vec3 rd) {
   if (rd.y >= -0.001) return -1.0;
   float t = (-5.8 - ro.y) / rd.y;
   return (t > 0.001 && t < 200.0) ? t : -1.0;
+}
+
+vec3 floorAlbedo(vec3 p) {
+  if (sceneMode == 4) {
+    return p.x < 0.0 ? vec3(0.9, 0.85, 0.1) : vec3(0.92);
+  }
+  if (sceneMode >= 3) return vec3(0.9);
+  return vec3(0.05, 0.08, 0.12);
+}
+
+bool shadowedByRod(vec3 p, vec3 lightDir) {
+  if (sceneMode < 3) return false;
+  vec3 rodC = vec3(0.5, -4.8, 0.0);
+  float r = 0.03;
+  vec3 oc = p - rodC;
+  float b = dot(oc, lightDir);
+  float c = dot(oc, oc) - r * r;
+  float disc = b * b - c;
+  if (disc < 0.0) return false;
+  float s = sqrt(disc);
+  float t = -b - s;
+  if (t < 0.001) t = -b + s;
+  if (t < 0.001) return false;
+  vec3 hit = p + lightDir * t;
+  return hit.y >= -5.8 && hit.y <= -3.8;
 }
 
 vec3 rotateCube(vec3 p) {
@@ -197,12 +273,16 @@ HitInfo traceScene(Ray r) {
   }
 
   float tFloor = intersectFloor(r.origin, r.direction);
+  float tRod = intersectRod(r.origin, r.direction);
+  float tGrey = intersectGreyPlane(r.origin, r.direction);
 
   float tMin = 1e20;
   int mat = -1;
   if (planeHit && tPlane < tMin) { tMin = tPlane; mat = 0; }
   if (tCube > 0.0 && tCube < tMin) { tMin = tCube; mat = 1; }
   if (tFloor > 0.0 && tFloor < tMin) { tMin = tFloor; mat = 2; }
+  if (tRod > 0.0 && tRod < tMin) { tMin = tRod; mat = 3; }
+  if (tGrey > 0.0 && tGrey < tMin) { tMin = tGrey; mat = 4; }
 
   if (mat >= 0) {
     info.hit = true;
@@ -261,10 +341,32 @@ float henyeyGreensteinPhase(float g, float cosTh) {
 }
 
 vec3 envLight(vec3 dir, float lambdaNm) {
-  vec3 sky = vec3(0.45, 0.65, 0.92);
-  float sunDot = max(dot(normalize(dir), normalize(sunDir)), 0.0);
-  float sun = pow(sunDot, 64.0) * 4.0 * sunIntensity;
-  return (sky + vec3(3.5, 3.2, 2.8) * sun) * spectrumWeight(lambdaNm);
+  vec3 d = normalize(dir);
+  float lambdaNorm = (lambdaNm - 400.0) / 300.0;
+  float rayleigh = atmosphereDensity * pow(1.0 - lambdaNorm, 4.0) * 0.8;
+  vec3 sky = mix(vec3(0.45, 0.65, 0.92), vec3(0.55, 0.75, 1.0), rayleigh);
+  sky *= mediumTint;
+
+  float up = max(d.y, 0.0);
+  float thickness = mediumThickness * atmosphereDensity;
+  sky *= mix(vec3(1.0), vec3(1.2, 0.95, 0.75), thickness * (1.0 - up));
+
+  float sunDot = max(dot(d, normalize(sunDir)), 0.0);
+  float airmass = 1.0 / max(d.y + 0.08, 0.05);
+  float sunAtten = exp(-airmass * atmosphereDensity * 0.15 * (1.0 + lambdaNorm));
+  float sun = pow(sunDot, 64.0) * 4.0 * sunIntensity * sunAtten;
+
+  float moonDot = max(dot(d, normalize(moonDir)), 0.0);
+  float moon = pow(moonDot, 128.0) * 6.0 * moonIntensity;
+
+  if (sceneMode == 2) {
+    vec3 flamePos = vec3(1.5, -4.5, 0.5);
+    float flameDist = length(d - normalize(flamePos - cameraPos));
+    float flame = exp(-flameDist * 8.0) * flameEdgeBoost;
+    sky += vec3(0.3, 0.5, 1.0) * flame;
+  }
+
+  return (sky + vec3(3.5, 3.2, 2.8) * sun + vec3(2.8, 2.6, 2.2) * moon) * spectrumWeight(lambdaNm);
 }
 
 vec3 cubeTexture(vec3 localP, vec3 localN) {
@@ -285,18 +387,33 @@ vec3 toneMap(vec3 hdr) {
 }
 
 // Volume scatter along leg — can redirect back to interface (trapped light escape)
+vec3 volumeAttenuation(float dist, float lambdaNm) {
+  float sigma = volumeSigma + turbidity * 0.12;
+  if (absorptionModel == 1) {
+    vec3 sw = spectrumWeight(lambdaNm);
+    vec3 att = exp(-sigmaLambda * sigma * dist * sw);
+    return att;
+  }
+  if (absorptionModel == 2) {
+    float warm = turbidity * dist * 0.15;
+    return mix(vec3(1.0), vec3(1.2, 0.95, 0.7), warm) * exp(-sigma * dist);
+  }
+  return vec3(exp(-sigma * dist));
+}
+
 bool volumeScatterLeg(Ray ray, float legDist, float lambdaNm, vec2 seed, int bounce,
                       inout vec3 throughput, inout vec3 accum, inout Ray outRay) {
-  float sigma_t = volumeSigma > 0.001 ? volumeSigma : 0.06;
+  float sigma_t = volumeSigma + turbidity * 0.12;
+  if (sigma_t < 0.001) return false;
   float sigma_s = sigma_t * 0.55;
   float g = volumeG;
-  vec3 godBeam = vec3(0.12, 0.28, 0.48) * spectrumWeight(lambdaNm);
+  vec3 godBeam = scatterTint * spectrumWeight(lambdaNm) * volumeTint;
 
   float u = hash3(vec3(seed, float(bounce)));
   float freePath = -log(max(u, 0.001)) / sigma_t;
 
   if (freePath > 0.001 && freePath < legDist && sigma_s > 0.001) {
-    float atten = exp(-sigma_t * freePath);
+    vec3 atten = volumeAttenuation(freePath, lambdaNm);
     throughput *= atten * (sigma_s / sigma_t);
     vec3 scatterDir = sampleHG(ray.direction, g, rand2(seed + float(bounce + 70)));
     float cosPh = dot(-ray.direction, scatterDir);
@@ -304,7 +421,7 @@ bool volumeScatterLeg(Ray ray, float legDist, float lambdaNm, vec2 seed, int bou
     accum += throughput * godBeam * ph * 0.06;
     outRay.origin = ray.origin + ray.direction * freePath + scatterDir * 0.002;
     outRay.direction = scatterDir;
-    return true; // continue path — may re-hit interface at escape angle
+    return true;
   }
   return false;
 }
@@ -331,25 +448,49 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
     vec3 I = ray.direction;
     vec3 N = hit.normal;
 
+    if (hit.material == 3) {
+      accum += throughput * vec3(0.02);
+      break;
+    }
+
+    if (hit.material == 4) {
+      vec3 grey = vec3(0.45);
+      accum += throughput * grey * spectrumWeight(lambdaNm);
+      break;
+    }
+
     // Cube proxy — lit ONLY by paths that actually transmitted through interface
     if (hit.material == 1) {
       vec3 cubeCenter = vec3(0.0, cubeDepth, 0.0);
       vec3 localP = rotateCubeInv(hit.point - cubeCenter);
       vec3 localN = rotateCubeInv(N);
       if (inWater) {
-        float sigma_t = volumeSigma > 0.001 ? volumeSigma : 0.06;
-        float att = exp(-sigma_t * hit.dist);
-        vec3 godBeam = vec3(0.12, 0.28, 0.48) * spectrumWeight(lambdaNm);
-        accum += throughput * godBeam * (1.0 - att) * 0.1;
+        vec3 att = volumeAttenuation(hit.dist, lambdaNm);
+        vec3 godBeam = scatterTint * spectrumWeight(lambdaNm);
+        accum += throughput * godBeam * (vec3(1.0) - att) * 0.1;
         throughput *= att;
       }
-      accum += throughput * cubeTexture(localP, localN) * spectrumWeight(lambdaNm);
+      vec3 albedo = cubeTexture(localP, localN);
+      vec3 sunL = normalize(sunDir);
+      vec3 fillL = normalize(fillDir);
+      float sunVis = shadowedByRod(hit.point, sunL) ? 0.0 : max(dot(localN, sunL), 0.0);
+      float fillVis = shadowedByRod(hit.point, fillL) ? 0.0 : max(dot(localN, fillL), 0.0);
+      vec3 lit = albedo * (sunVis * sunIntensity * vec3(1.1, 1.0, 0.85) + fillVis * fillIntensity * fillTint);
+      accum += throughput * lit * spectrumWeight(lambdaNm);
       break;
     }
 
     if (hit.material == 2) {
-      float att = exp(-0.12 * hit.dist);
-      accum += throughput * att * vec3(0.05, 0.08, 0.12) * spectrumWeight(lambdaNm);
+      vec3 alb = floorAlbedo(hit.point);
+      vec3 sunL = normalize(sunDir);
+      vec3 fillL = normalize(fillDir);
+      bool sunSh = shadowedByRod(hit.point, sunL);
+      bool fillSh = shadowedByRod(hit.point, fillL);
+      vec3 lit = vec3(0.0);
+      if (!sunSh) lit += alb * sunIntensity * vec3(1.1, 1.0, 0.85) * max(dot(N, sunL), 0.0);
+      if (!fillSh) lit += alb * fillIntensity * fillTint * max(dot(N, fillL), 0.0);
+      if (sunSh && fillSh) lit = alb * 0.02;
+      accum += throughput * lit * spectrumWeight(lambdaNm);
       break;
     }
 
@@ -386,7 +527,15 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
 
     if (chooseReflect) {
       nextDir = normalize(I - 2.0 * dot(I, N_micro) * N_micro);
-      // TIR: trapped inside water — bounces until wave topology tilts normal enough to escape
+      if (!fromInside && secondaryReflectWeight > 0.001) {
+        vec3 reflDir = normalize(nextDir);
+        if (reflDir.y < -0.05) {
+          float tFl = (-5.8 - hit.point.y) / reflDir.y;
+          if (tFl > 0.001 && tFl < 30.0) {
+            accum += throughput * floorReflectance * secondaryReflectWeight * vec3(0.08, 0.1, 0.14);
+          }
+        }
+      }
     } else {
       nextDir = normalize(refractDir(I, N_micro, eta));
       if (interfaceRoughness > 0.001) {
@@ -431,6 +580,49 @@ void main() {
 
   if (displayOnly > 0.5) {
     vec3 accumulated = texture2D(accumTexture, uv).rgb;
+
+    if (physiologicalContrast > 0.5) {
+      vec2 px = 1.0 / resolution;
+      vec3 avg = vec3(0.0);
+      for (int dy = -2; dy <= 2; dy++) {
+        for (int dx = -2; dx <= 2; dx++) {
+          avg += texture2D(accumTexture, uv + vec2(float(dx), float(dy)) * px * 4.0).rgb;
+        }
+      }
+      avg /= 25.0;
+      vec3 opp = vec3(1.0) - avg;
+      accumulated += opp * opponentStrength * 0.15;
+    }
+
+    if (complementStrength > 0.001) {
+      float lum = dot(accumulated, vec3(0.299, 0.587, 0.114));
+      vec3 opp = vec3(1.0) - accumulated / max(lum, 0.001);
+      float shadowMask = 1.0 - smoothstep(0.02, 0.12, lum);
+      accumulated += opp * complementStrength * shadowMask * 0.2;
+    }
+
+    if (bloomStrength > 0.001) {
+      vec2 px = 1.0 / resolution;
+      vec3 bloom = vec3(0.0);
+      for (int i = 1; i <= 3; i++) {
+        float fi = float(i);
+        bloom += texture2D(accumTexture, uv + vec2(fi, 0.0) * px * 3.0).rgb;
+        bloom += texture2D(accumTexture, uv - vec2(fi, 0.0) * px * 3.0).rgb;
+        bloom += texture2D(accumTexture, uv + vec2(0.0, fi) * px * 3.0).rgb;
+        bloom += texture2D(accumTexture, uv - vec2(0.0, fi) * px * 3.0).rgb;
+      }
+      bloom /= 12.0;
+      float bright = max(bloom.r, max(bloom.g, bloom.b));
+      accumulated += bloom * bloomStrength * smoothstep(0.3, 0.8, bright);
+    }
+
+    if (fixationStrength > 0.01) {
+      vec2 center = vec2(0.5, 0.45);
+      float d = length(uv - center);
+      float mask = smoothstep(0.15, 0.05, d) * fixationStrength;
+      accumulated += vec3(0.1, 0.35, 0.45) * mask * 0.25;
+    }
+
     vec2 vigUv = uv * 2.0 - 1.0;
     accumulated *= 1.0 - dot(vigUv, vigUv) * vignetteStrength;
     gl_FragColor = vec4(toneMap(accumulated), 1.0);

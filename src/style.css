@@ -50,7 +50,93 @@ header h1 {
 .subtitle {
   font-size: 10px;
   color: #7a8a9a;
-  margin: 3px 0 10px;
+  margin: 3px 0 6px;
+}
+
+.chapter-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.badge-physical {
+  background: rgba(60, 140, 90, 0.35);
+  color: #8fd4a8;
+  border: 1px solid rgba(80, 180, 120, 0.4);
+}
+
+.badge-mixed {
+  background: rgba(160, 120, 60, 0.35);
+  color: #e8c878;
+  border: 1px solid rgba(200, 160, 80, 0.4);
+}
+
+.badge-physiologicalviewer {
+  background: rgba(140, 80, 160, 0.35);
+  color: #d8a8f0;
+  border: 1px solid rgba(180, 100, 200, 0.4);
+}
+
+.chapter-caption {
+  font-size: 10px;
+  color: #8a9aaa;
+  font-style: italic;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.goethe-section h3.subsection {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #4a7a9a;
+  margin: 8px 0 6px;
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.chapter-btn {
+  padding: 5px 6px;
+  background: rgba(35, 60, 85, 0.5);
+  border: 1px solid rgba(80, 140, 180, 0.25);
+  border-radius: 5px;
+  color: #a8c0d8;
+  font-size: 9px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chapter-btn:hover {
+  background: rgba(50, 90, 130, 0.55);
+  border-color: rgba(100, 180, 240, 0.4);
+}
+
+.chapter-btn.active {
+  background: rgba(50, 120, 180, 0.45);
+  border-color: #4a9fd4;
+  color: #fff;
+}
+
+.water-btn {
+  border-color: rgba(80, 160, 140, 0.3);
+}
+
+label select {
+  flex: 1;
+  background: rgba(20, 35, 50, 0.8);
+  border: 1px solid rgba(80, 140, 180, 0.3);
+  border-radius: 4px;
+  color: #c8d8e8;
+  font-size: 10px;
+  padding: 2px 4px;
 }
 
 .panel-scroll {

@@ -9,35 +9,36 @@ The real work is driven by:
 
 ## Current Big Picture
 
-Oceanscape Web is live in code: Vite + TypeScript + Three.js GPU path tracer with dielectric interface physics (Fresnel/Snell/TIR), animated wave surface, volume god rays, rotating submerged cube, full UI controls, and temporal accumulation. Built and deployed to `gh-pages` branch. URL: https://pranavsai142.github.io/raytracing/ (enable Pages from gh-pages branch in repo settings if 404).
+Oceanscape Web + **Goethe visual book (first code landing)**. Vite + TypeScript + Three.js GPU path tracer: dielectric interface (Fresnel/Snell/TIR), waves, temporal accumulation, submerged rotating cube. **Goethe layer:** chapter panel, 8 book chapters + 6 water presets, `applyChapterPreset`, `#chapter=` URLs, badges (PHYSICAL/MIXED/PHYSIOLOGICAL), neutral water (`scatterTint`, `turbidity`, `absorptionModel`), dual-light shadows, display-post physiology.
+
+**Build:** `npm run build` passes. **Deploy:** gh-pages may lag — redeploy needed. **Validation:** zero PNGs in `notes/GROK/validation/goethe/` yet.
 
 ## Hard-Won Lessons
 
 ### 1. Port the physics, not the platform
-- Metal ray tracing → WebGL fragment shader path tracer with analytic intersections.
-- Dielectric math (Fresnel/Snell/TIR) ports directly; acceleration structures become manual ray-box/plane tests.
+- Metal → WebGL fragment path tracer; analytic intersections.
 
 ### 2. Cube is the validation anchor
-- Rotating textured cube at y=-3, water plane at y=0.
-- All interface phenomena must be visible on/through the cube.
+- Rotating checkerboard cube submerged below water plane. Chapters change lighting/presets, not cube role. **Note:** default `cubeDepth` is -2.2 in code (SOUL_DRIVER still says -3).
+
+### 3. Goethe = two-layer honesty
+- Physical: path-traced radiance. Physiological: complement/contrast/bloom/afterimage in **labeled** display pass — never fake water pigment.
 
 ## How We Work
 
-- Run `/init` at the start of every session.
-- Run `/done` when finishing meaningful work.
-- Build: `npm run build`
-- Dev: `npm run dev`
-- Deploy: `npm run deploy` (build + gh-pages)
-- Verify: app loads, path tracer renders, controls work, no console errors.
+- `/init` at session start · `/done` at close
+- Build: `npm run build` · Dev: `npm run dev` · Deploy: `npm run deploy`
+- Contract: `REQ-goethe-theory-of-colours.md`, `REQ-goethe-water.md`
+- Scorecard: latest handoff `2026-06-16-goethe-implementation-handoff.md`
 
 ## Next Focus
 
-**Goethe visual book** — implement P0 from requirements docs:
-- `notes/GROK/REQ-goethe-theory-of-colours.md` (GTC-00 shell, chapters I–III, V)
-- `notes/GROK/REQ-goethe-water.md` (WTR-01 neutral water, WTR-02 preset, WTR-05 diver)
-
-Source text: `THEORY_OF_COLOURS.md`. Synopses in `notes/GROK/goethe-*-synopsis.md`. See latest handoff.
+1. **Validation PNGs** — REQ verification matrix (all chapters + WTR-02/05)
+2. **P2 geometry** — WTR-06 vase, WTR-07 water-prism (buttons + shader)
+3. **GTC-07** — real `afterimageBuffer`, not fixation tint stub
+4. **Gaps** — physiological UI labels, `godRayMode`, candle in shader, deploy
+5. See handoff for full PARTIAL/NOT DONE list per REQ ID
 
 ---
 
-*Update this file lightly at the end of significant sessions. Put the real detail in the handoff.*
+*Update lightly each session. Detail lives in handoffs.*
