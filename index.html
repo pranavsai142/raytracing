@@ -18,178 +18,268 @@
         </header>
 
         <div class="panel-scroll">
-          <section class="panel-section goethe-section">
-            <h2>Goethe Chapters</h2>
-            <div class="chapter-grid">
-              <button class="chapter-btn" data-chapter="ocean">Ocean</button>
-              <button class="chapter-btn" data-chapter="primordial" title="§175">I Primordial</button>
-              <button class="chapter-btn" data-chapter="atmosphere" title="§155">II Atmosphere</button>
-              <button class="chapter-btn" data-chapter="shadows" title="§76">III Shadows</button>
-              <button class="chapter-btn" data-chapter="shadows-underwater" title="§78">III Underwater</button>
-              <button class="chapter-btn" data-chapter="contrast" title="§56">IV Contrast</button>
-              <button class="chapter-btn" data-chapter="refraction" title="§227">V Refraction</button>
-              <button class="chapter-btn" data-chapter="double-reflect" title="§224">VI Double</button>
-              <button class="chapter-btn" data-chapter="afterimage" title="§50">VII After</button>
-              <button class="chapter-btn" data-chapter="twilight" title="§85">VIII Twilight</button>
+          <details class="panel-section" open>
+            <summary>Goethe Chapters</summary>
+            <div class="section-body">
+              <div class="chapter-grid">
+                <button class="chapter-btn tip" data-chapter="ocean" data-tip="Default ocean dielectric path-trace: water IOR, waves, submerged cube, Snell/TIR.">Ocean</button>
+                <button class="chapter-btn tip" data-chapter="primordial" title="§175" data-tip="§175 Primordial phenomena: light and darkness through a colourless medium (thickness + turbidity).">I Primordial</button>
+                <button class="chapter-btn tip" data-chapter="atmosphere" title="§155" data-tip="§155 Atmosphere: denser sky, lower sun, flame-edge warm/cool borders.">II Atmosphere</button>
+                <button class="chapter-btn tip" data-chapter="shadows" title="§76" data-tip="§76 Coloured shadows: low sun + contrary fill light on land-side view.">III Shadows</button>
+                <button class="chapter-btn tip" data-chapter="shadows-underwater" title="§78" data-tip="§78 Underwater coloured shadows with physiological complement boost.">III Underwater</button>
+                <button class="chapter-btn tip" data-chapter="contrast" title="§56" data-tip="§56 Simultaneous contrast: physiological opponent processing (post).">IV Contrast</button>
+                <button class="chapter-btn tip" data-chapter="refraction" title="§227" data-tip="§227 Refraction/dispersion: chromatic caustics via wavelength-dependent IOR.">V Refraction</button>
+                <button class="chapter-btn tip" data-chapter="double-reflect" title="§224" data-tip="§224 Double reflection: secondary reflect weight + floor bounce (flat water).">VI Double</button>
+                <button class="chapter-btn tip" data-chapter="afterimage" title="§50" data-tip="§50 Afterimage: fixation hold then opponent afterimage decay.">VII After</button>
+                <button class="chapter-btn tip" data-chapter="twilight" title="§85" data-tip="§85 Twilight: near-horizon sun, moon/candle, warm residual light.">VIII Twilight</button>
+              </div>
+              <h3 class="subsection">Water Phenomena</h3>
+              <div class="chapter-grid">
+                <button class="chapter-btn water-btn tip" data-chapter="goethe-colourless-water" title="§161" data-tip="§161 Colourless water: minimal turbidity/scatter tint — light relations only.">No Colour</button>
+                <button class="chapter-btn water-btn tip" data-chapter="diver-view" title="§78" data-tip="Diver: below water, Beer absorption, stronger volume + complement.">Diver</button>
+                <button class="chapter-btn water-btn tip" data-chapter="vessel-elevation" title="§187" data-tip="§187 Vessel elevation: shallow cube, near-clear water, surface view.">Vessel</button>
+                <button class="chapter-btn water-btn tip" data-chapter="wave-contrast" title="§57" data-tip="§57 Agitated surface: larger waves, contrast at crests/troughs.">Agitated</button>
+                <button class="chapter-btn water-btn tip" data-chapter="twilight-ocean" title="§75" data-tip="§75 Twilight ocean: time-of-day drives sea-green shadows → grey.">Twilight</button>
+                <button class="chapter-btn water-btn tip" data-chapter="sun-glitter" title="§93" data-tip="§93 Sun glitter: grazing sun, bloom on specular peaks.">Glitter</button>
+              </div>
             </div>
-            <h3 class="subsection">Water Phenomena</h3>
-            <div class="chapter-grid">
-              <button class="chapter-btn water-btn" data-chapter="goethe-colourless-water" title="§161">No Colour</button>
-              <button class="chapter-btn water-btn" data-chapter="diver-view" title="§78">Diver</button>
-              <button class="chapter-btn water-btn" data-chapter="vessel-elevation" title="§187">Vessel</button>
-              <button class="chapter-btn water-btn" data-chapter="wave-contrast" title="§57">Agitated</button>
-              <button class="chapter-btn water-btn" data-chapter="twilight-ocean" title="§75">Twilight</button>
-              <button class="chapter-btn water-btn" data-chapter="sun-glitter" title="§93">Glitter</button>
+          </details>
+
+          <details class="panel-section" open>
+            <summary>Render Quality</summary>
+            <div class="section-body">
+              <label class="tip" data-tip="Path-traced samples integrated per LIVE frame, or added per STILL sample tick. Higher = less noise, more GPU cost.">
+                Samples / Frame <input type="range" id="samples-per-frame" min="1" max="4" step="1" value="1" /><span id="samples-per-frame-val">1</span>
+              </label>
+              <label class="tip" data-tip="Cap on progressive STILL accumulation (1/N averaging). After this many samples, no more are added until Reset. LIVE ignores this cap for continuous redraw.">
+                Max Accum Samples <input type="range" id="max-accum" min="32" max="1024" step="16" value="256" /><span id="max-accum-val">256</span>
+              </label>
+              <label class="tip" data-tip="Only for early STILL frames before full progressive 1/N takes over. LIVE never blends history (avoids ghost caustics).">
+                Temporal Smoothing <input type="range" id="temporal-blend" min="0.02" max="0.2" step="0.01" value="0.05" /><span id="temporal-blend-val">0.05</span>
+              </label>
+              <label class="tip" data-tip="Internal path-trace resolution scale vs display. Lower = faster GPU, softer image.">
+                Render Scale <input type="range" id="render-scale" min="0.35" max="1" step="0.05" value="0.75" /><span id="render-scale-val">0.75</span>
+              </label>
+              <label class="tip" data-tip="STILL mode: how often new path samples are added. LIVE path-traces every display frame. Display always runs full FPS.">
+                Sample Rate (FPS) <input type="range" id="sample-fps" min="4" max="60" step="1" value="30" /><span id="sample-fps-val">30</span>
+              </label>
+              <label class="tip" data-tip="Max light bounces per ray. Lower = faster. TIR trapping and multi-bounce caustics need ≥4–6.">
+                Max Bounces <input type="range" id="max-bounces" min="3" max="10" step="1" value="6" /><span id="max-bounces-val">6</span>
+              </label>
+              <label class="tip" data-tip="HDR exposure multiplier before tone mapping — scales final luminance, not scene lights.">
+                Exposure <input type="range" id="exposure" min="0.5" max="3" step="0.05" value="1.35" /><span id="exposure-val">1.35</span>
+              </label>
+              <label class="tip" data-tip="Post-process edge darkening (optical vignette), not path-traced occlusion.">
+                Vignette <input type="range" id="vignette" min="0" max="0.6" step="0.01" value="0.25" /><span id="vignette-val">0.25</span>
+              </label>
+              <label class="tip" data-tip="Post-process bloom around bright specular peaks (e.g. sun glitter). Not volumetric scatter.">
+                Bloom Strength <input type="range" id="bloom" min="0" max="1" step="0.05" value="0" /><span id="bloom-val">0</span>
+              </label>
             </div>
-          </section>
-          <section class="panel-section">
-            <h2>Render Quality</h2>
-            <label class="tip" data-tip="Path-traced samples per LIVE frame, or added per still-frame. Higher = less noise, more GPU.">
-              Samples / Frame <input type="range" id="samples-per-frame" min="1" max="4" step="1" value="1" /><span id="samples-per-frame-val">1</span>
-            </label>
-            <label class="tip" data-tip="Only used for early STILL frames. STILL mode uses true progressive 1/N averaging for caustics/TIR. LIVE never blends history.">
-              Temporal Smoothing <input type="range" id="temporal-blend" min="0.02" max="0.2" step="0.01" value="0.05" /><span id="temporal-blend-val">0.05</span>
-            </label>
-            <label class="tip" data-tip="Internal path-trace resolution scale. Lower = faster GPU, slightly softer image.">
-              Render Scale <input type="range" id="render-scale" min="0.35" max="1" step="0.05" value="0.75" /><span id="render-scale-val">0.75</span>
-            </label>
-            <label class="tip" data-tip="STILL mode: how often new samples are added. LIVE path-traces every display frame. Display always full FPS.">
-              Sample Rate (FPS) <input type="range" id="sample-fps" min="4" max="60" step="1" value="30" /><span id="sample-fps-val">30</span>
-            </label>
-            <label class="tip" data-tip="Max light bounces per ray. Lower = faster. TIR trapping needs ≥4 bounces.">
-              Max Bounces <input type="range" id="max-bounces" min="3" max="10" step="1" value="6" /><span id="max-bounces-val">6</span>
-            </label>
-            <label class="tip" data-tip="HDR exposure before tone mapping.">
-              Exposure <input type="range" id="exposure" min="0.5" max="3" step="0.05" value="1.35" /><span id="exposure-val">1.35</span>
-            </label>
-            <label class="tip" data-tip="Edge darkening strength.">
-              Vignette <input type="range" id="vignette" min="0" max="0.6" step="0.01" value="0.25" /><span id="vignette-val">0.25</span>
-            </label>
-          </section>
+          </details>
 
-          <section class="panel-section">
-            <h2>Water Physics</h2>
-            <label class="tip" data-tip="Index of refraction (air→water). 1.33 is real water. Higher = more bending & smaller Snell's window.">
-              Water IOR <input type="range" id="ior" min="1.0" max="1.8" step="0.01" value="1.33" /><span id="ior-val">1.33</span>
-            </label>
-            <label class="tip" data-tip="Microfacet roughness at the interface. 0 = mirror-smooth. Softens caustics & reflections macro TIR/Snell stay exact.">
-              Interface Roughness <input type="range" id="roughness" min="0" max="1" step="0.01" value="0.06" /><span id="roughness-val">0.06</span>
-            </label>
-            <label class="tip" data-tip="Wavelength-dependent IOR. Chromatic caustics emerge from real Snell separation — not a color filter.">
-              Spectral Dispersion <input type="range" id="dispersion" min="0" max="0.05" step="0.001" value="0.012" /><span id="dispersion-val">0.012</span>
-            </label>
-          </section>
+          <details class="panel-section" open>
+            <summary>Water Physics</summary>
+            <div class="section-body">
+              <label class="tip" data-tip="Relative index of refraction air→water. 1.33 is real water. Higher = stronger bending and a smaller Snell's window from below.">
+                Water IOR <input type="range" id="ior" min="1.0" max="1.8" step="0.01" value="1.33" /><span id="ior-val">1.33</span>
+              </label>
+              <label class="tip" data-tip="Microfacet roughness at the air–water interface. 0 = mirror. Softens specular/caustics; macro Snell/TIR remain exact.">
+                Interface Roughness <input type="range" id="roughness" min="0" max="1" step="0.01" value="0.06" /><span id="roughness-val">0.06</span>
+              </label>
+              <label class="tip" data-tip="Wavelength-dependent IOR spread. Chromatic caustics from real Snell separation per channel — not a color filter.">
+                Spectral Dispersion <input type="range" id="dispersion" min="0" max="0.05" step="0.001" value="0.012" /><span id="dispersion-val">0.012</span>
+              </label>
+              <label class="tip" data-tip="Beer-law absorption coefficients per RGB (λ-dependent extinction). Higher R removes red first at depth; used when Absorption Model = Beer.">
+                σλ R <input type="range" id="sigma-r" min="0" max="0.4" step="0.01" value="0.04" />
+                G <input type="range" id="sigma-g" min="0" max="0.4" step="0.01" value="0.08" />
+                B <input type="range" id="sigma-b" min="0" max="0.4" step="0.01" value="0.18" />
+              </label>
+              <label class="tip" data-tip="Beer = modern λ absorption (red fades with path length). Goethe = warm bright-path shift via semi-opacity. Neutral = scalar density only.">
+                Absorption Model
+                <select id="absorption-model">
+                  <option value="neutral">Neutral</option>
+                  <option value="beer">Beer (modern)</option>
+                  <option value="goethe">Goethe semi-opacity</option>
+                </select>
+              </label>
+            </div>
+          </details>
 
-          <section class="panel-section">
-            <h2>Wave Topology</h2>
-            <label class="tip" data-tip="Wave height — surface topology tilts normals and changes when trapped light can escape (TIR escape angles).">
-              Wave Amplitude <input type="range" id="wave-amp" min="0" max="0.25" step="0.005" value="0.08" /><span id="wave-amp-val">0.08</span>
-            </label>
-            <label class="tip" data-tip="Spatial frequency of wave pattern on the water surface.">
-              Wave Frequency <input type="range" id="wave-freq" min="0.2" max="1.5" step="0.05" value="0.5" /><span id="wave-freq-val">0.5</span>
-            </label>
-            <label class="tip" data-tip="How fast wave phases scroll (before time-scale multiplier).">
-              Wave Speed <input type="range" id="wave-spd" min="0.1" max="2" step="0.05" value="0.6" /><span id="wave-spd-val">0.6</span>
-            </label>
-            <label class="tip" data-tip="Wave/cube speed when LIVE. Does not apply when Animate is off (STILL freeze).">
-              Time Scale <input type="range" id="time-scale" min="0" max="1" step="0.01" value="0.15" /><span id="time-scale-val">0.15</span>
-            </label>
-            <label class="tip" data-tip="ON = LIVE path-trace (realtime, noisy, no ghost blend). OFF = freeze waves+cube and progressive-accumulate so Snell/TIR/caustics clean up. This is how you get a clean still of trapped ocean light.">
-              <input type="checkbox" id="animate-waves" checked /> Animate Scene (LIVE)
-            </label>
-          </section>
+          <details class="panel-section" open>
+            <summary>Wave Topology</summary>
+            <div class="section-body">
+              <label class="tip" data-tip="Base height for 4 octaves of directional sines (not a single pure sine). Fixed internal direction/octave ratios; this scales overall amplitude. Tilts normals and changes TIR escape angles.">
+                Wave Amplitude <input type="range" id="wave-amp" min="0" max="0.25" step="0.005" value="0.08" /><span id="wave-amp-val">0.08</span>
+              </label>
+              <label class="tip" data-tip="Base spatial frequency for the 4-octave directional sine sum. Higher = finer ripples; octaves keep fixed ratios above this base.">
+                Wave Frequency <input type="range" id="wave-freq" min="0.2" max="1.5" step="0.05" value="0.5" /><span id="wave-freq-val">0.5</span>
+              </label>
+              <label class="tip" data-tip="Base phase speed for the 4-octave directional sines (before Time Scale). Higher = faster scrolling crests.">
+                Wave Speed <input type="range" id="wave-spd" min="0.1" max="2" step="0.05" value="0.6" /><span id="wave-spd-val">0.6</span>
+              </label>
+              <label class="tip" data-tip="Multiplier on wave + cube motion when LIVE. Does not advance sim time when Animate is off (STILL freeze).">
+                Time Scale <input type="range" id="time-scale" min="0" max="1" step="0.01" value="0.15" /><span id="time-scale-val">0.15</span>
+              </label>
+              <label class="tip" data-tip="ON = LIVE path-trace (realtime, noisy, no history blend). OFF = STILL: freeze waves+cube and progressive-accumulate so Snell/TIR/caustics converge. Use STILL for clean stills of trapped ocean light.">
+                <input type="checkbox" id="animate-waves" checked /> Animate Scene (LIVE)
+              </label>
+            </div>
+          </details>
 
-          <section class="panel-section">
-            <h2>Lighting & Volume</h2>
-            <label class="tip" data-tip="Sun angle above horizon. Affects transmission energy & caustics on the cube.">
-              Sun Elevation <input type="range" id="sun-elev" min="0.1" max="1.5" step="0.01" value="0.8" /><span id="sun-elev-val">0.8</span>
-            </label>
-            <label class="tip" data-tip="Sun direction around the horizon (azimuth).">
-              Sun Azimuth <input type="range" id="sun-az" min="0" max="6.28" step="0.05" value="0.4" /><span id="sun-az-val">0.4</span>
-            </label>
-            <label class="tip" data-tip="Sun brightness multiplier in the environment map.">
-              Sun Intensity <input type="range" id="sun-int" min="0.2" max="3" step="0.05" value="1.2" /><span id="sun-int-val">1.2</span>
-            </label>
-            <label class="tip" data-tip="Participating medium density inside water. God-ray scatter along underwater paths.">
-              Volume Density <input type="range" id="volume-sigma" min="0" max="0.25" step="0.005" value="0.05" /><span id="volume-sigma-val">0.05</span>
-            </label>
-            <label class="tip" data-tip="Henyey-Greenstein asymmetry. Positive = forward scatter (sunbeams), 0 = isotropic.">
-              Volume Scatter G <input type="range" id="volume-g" min="-0.2" max="0.9" step="0.05" value="0.55" /><span id="volume-g-val">0.55</span>
-            </label>
-            <label class="tip" data-tip="Goethe §161: semi-opacity, not water colour. Thickness changes lit/dark relations.">
-              Semi-opacity (Turbidity) <input type="range" id="turbidity" min="0" max="1" step="0.01" value="0.05" /><span id="turbidity-val">0.05</span>
-            </label>
-            <label class="tip" data-tip="Beer = modern λ absorption (red at depth). Goethe = warm bright-path shift. Neutral = scalar only.">
-              Absorption Model
-              <select id="absorption-model">
-                <option value="neutral">Neutral</option>
-                <option value="beer">Beer (modern)</option>
-                <option value="goethe">Goethe semi-opacity</option>
-              </select>
-            </label>
-            <label class="tip" data-tip="God-ray tint. White (1,1,1) = colourless medium. Blue only for §151 darkness-through-medium demos.">
-              Scatter R <input type="range" id="scatter-r" min="0" max="1" step="0.05" value="1" />
-              G <input type="range" id="scatter-g" min="0" max="1" step="0.05" value="1" />
-              B <input type="range" id="scatter-b" min="0" max="1" step="0.05" value="1" />
-            </label>
-            <label class="tip" data-tip="§175: light + darkness through colourless medium thickness.">
-              Medium Thickness <input type="range" id="medium-thickness" min="0" max="1" step="0.05" value="0.3" /><span id="medium-thickness-val">0.3</span>
-            </label>
-            <label class="tip" data-tip="Rayleigh-style sky density. Zenith blue deepens as sun lowers.">
-              Atmosphere Density <input type="range" id="atmosphere-density" min="0" max="2" step="0.05" value="0.5" /><span id="atmosphere-density-val">0.5</span>
-            </label>
-            <label class="tip" data-tip="Contrary fill light for coloured shadows (§76).">
-              Fill Intensity <input type="range" id="fill-intensity" min="0" max="1" step="0.05" value="0.35" /><span id="fill-intensity-val">0.35</span>
-            </label>
-            <label class="tip" data-tip="§78 physiological: green shadow boost. Labeled post-process, not water pigment.">
-              Complement Strength <input type="range" id="complement-strength" min="0" max="1" step="0.05" value="0" /><span id="complement-strength-val">0</span>
-            </label>
-            <label class="tip" data-tip="§75–76: sunset → sea-green shadows → grey twilight → moon.">
-              Time of Day <input type="range" id="time-of-day" min="0" max="1" step="0.01" value="0.5" /><span id="time-of-day-val">0.5</span>
-            </label>
-            <label class="tip" data-tip="§163 chemical tint experiment — not default ocean colour.">
-              Volume Tint R <input type="range" id="volume-tint-r" min="0.5" max="1.5" step="0.05" value="1" />
-              G <input type="range" id="volume-tint-g" min="0.5" max="1.5" step="0.05" value="1" />
-              B <input type="range" id="volume-tint-b" min="0.5" max="1.5" step="0.05" value="1" />
-            </label>
-          </section>
+          <details class="panel-section" open>
+            <summary>Lighting &amp; Volume</summary>
+            <div class="section-body">
+              <h3 class="subsection">Sun</h3>
+              <label class="tip" data-tip="Sun elevation above horizon (radians-ish scale in sim). Affects transmission energy, caustic strength, and sky warm/cool.">
+                Sun Elevation <input type="range" id="sun-elev" min="0.1" max="1.5" step="0.01" value="0.8" /><span id="sun-elev-val">0.8</span>
+              </label>
+              <label class="tip" data-tip="Sun azimuth around the horizon — rotates light direction for shadows and caustics.">
+                Sun Azimuth <input type="range" id="sun-az" min="0" max="6.28" step="0.05" value="0.4" /><span id="sun-az-val">0.4</span>
+              </label>
+              <label class="tip" data-tip="Sun brightness multiplier in the environment / direct contribution.">
+                Sun Intensity <input type="range" id="sun-int" min="0.2" max="3" step="0.05" value="1.2" /><span id="sun-int-val">1.2</span>
+              </label>
+              <label class="tip" data-tip="§75–76 continuous dial: sunset → sea-green shadows → grey twilight → moon. Updates sun/fill/moon together.">
+                Time of Day <input type="range" id="time-of-day" min="0" max="1" step="0.01" value="0.5" /><span id="time-of-day-val">0.5</span>
+              </label>
 
-          <section class="panel-section">
-            <h2>Scene</h2>
-            <label class="tip" data-tip="Y position of submerged test cube. Closer to surface = stronger caustics interaction.">
-              Cube Depth <input type="range" id="cube-depth" min="-4" max="-1" step="0.1" value="-2.2" /><span id="cube-depth-val">-2.2</span>
-            </label>
-            <label class="tip" data-tip="Cube rotation speed (Y axis). Slower = less flicker during accumulation.">
-              Cube Spin Y <input type="range" id="cube-spin-y" min="0" max="0.02" step="0.001" value="0.004" /><span id="cube-spin-y-val">0.004</span>
-            </label>
-            <label class="tip" data-tip="Cube rotation speed (X axis).">
-              Cube Spin X <input type="range" id="cube-spin-x" min="0" max="0.02" step="0.001" value="0.002" /><span id="cube-spin-x-val">0.002</span>
-            </label>
-          </section>
+              <h3 class="subsection">Volume / medium</h3>
+              <label class="tip" data-tip="Participating-medium extinction/scatter density in water. Higher = denser god-rays and more path extinction.">
+                Volume Density <input type="range" id="volume-sigma" min="0" max="0.25" step="0.005" value="0.05" /><span id="volume-sigma-val">0.05</span>
+              </label>
+              <label class="tip" data-tip="Henyey–Greenstein asymmetry g. Positive = forward scatter (sunbeams), 0 = isotropic, negative = backscatter.">
+                Volume Scatter G <input type="range" id="volume-g" min="-0.2" max="0.9" step="0.05" value="0.55" /><span id="volume-g-val">0.55</span>
+              </label>
+              <label class="tip" data-tip="Goethe §161: semi-opacity of the medium, not a painted water colour. Changes lit vs dark path relations.">
+                Semi-opacity (Turbidity) <input type="range" id="turbidity" min="0" max="1" step="0.01" value="0.05" /><span id="turbidity-val">0.05</span>
+              </label>
+              <label class="tip" data-tip="RGB multiplier on in-scatter (god-ray tint). White (1,1,1) = colourless medium. Blue only for darkness-through-medium demos.">
+                Scatter R <input type="range" id="scatter-r" min="0" max="1" step="0.05" value="1" />
+                G <input type="range" id="scatter-g" min="0" max="1" step="0.05" value="1" />
+                B <input type="range" id="scatter-b" min="0" max="1" step="0.05" value="1" />
+              </label>
+              <label class="tip" data-tip="§163 chemical tint experiment on the volume path — not default ocean pigment.">
+                Volume Tint R <input type="range" id="volume-tint-r" min="0.5" max="1.5" step="0.05" value="1" />
+                G <input type="range" id="volume-tint-g" min="0.5" max="1.5" step="0.05" value="1" />
+                B <input type="range" id="volume-tint-b" min="0.5" max="1.5" step="0.05" value="1" />
+              </label>
+              <label class="tip" data-tip="§175 medium path length scale: light + darkness through colourless thickness.">
+                Medium Thickness <input type="range" id="medium-thickness" min="0" max="1" step="0.05" value="0.3" /><span id="medium-thickness-val">0.3</span>
+              </label>
+              <label class="tip" data-tip="RGB tint of the Goethe colourless-medium path (usually white). Colours the thickness term without painting the water body.">
+                Medium Tint R <input type="range" id="medium-tint-r" min="0.5" max="1.5" step="0.05" value="1" />
+                G <input type="range" id="medium-tint-g" min="0.5" max="1.5" step="0.05" value="1" />
+                B <input type="range" id="medium-tint-b" min="0.5" max="1.5" step="0.05" value="1" />
+              </label>
+              <label class="tip" data-tip="Rayleigh-style sky density. Zenith blue and horizon warm deepen as density rises / sun lowers.">
+                Atmosphere Density <input type="range" id="atmosphere-density" min="0" max="2" step="0.05" value="0.5" /><span id="atmosphere-density-val">0.5</span>
+              </label>
 
-          <section class="panel-section">
-            <h2>Camera</h2>
-            <label class="tip" data-tip="Field of view in degrees.">
-              FOV <input type="range" id="fov" min="35" max="90" step="1" value="55" /><span id="fov-val">55</span>
-            </label>
-            <label class="tip" data-tip="Max WASD fly speed.">
-              Move Speed <input type="range" id="move-speed" min="0.3" max="4" step="0.1" value="1.2" /><span id="move-speed-val">1.2</span>
-            </label>
-            <label class="tip" data-tip="Acceleration when holding movement keys.">
-              Move Accel <input type="range" id="move-accel" min="1" max="12" step="0.5" value="3.5" /><span id="move-accel-val">3.5</span>
-            </label>
-            <label class="tip" data-tip="Mouse drag sensitivity for look.">
-              Mouse Sensitivity <input type="range" id="mouse-sens" min="0.0005" max="0.006" step="0.0001" value="0.0018" /><span id="mouse-sens-val">0.0018</span>
-            </label>
-          </section>
+              <h3 class="subsection">Fill / contrary light</h3>
+              <label class="tip" data-tip="Contrary fill light intensity for coloured shadows (§76). Opposes the sun so shadow hue shifts.">
+                Fill Intensity <input type="range" id="fill-intensity" min="0" max="1" step="0.05" value="0.35" /><span id="fill-intensity-val">0.35</span>
+              </label>
+              <label class="tip" data-tip="RGB colour of the contrary fill (§76). Cool fill under warm sun → greenish/blueish shadows.">
+                Fill Tint R <input type="range" id="fill-tint-r" min="0" max="1" step="0.05" value="0.7" />
+                G <input type="range" id="fill-tint-g" min="0" max="1" step="0.05" value="0.85" />
+                B <input type="range" id="fill-tint-b" min="0" max="1" step="0.05" value="1" />
+              </label>
+              <label class="tip" data-tip="Fill light direction vector components (world space, will be used as-is). Adjust to aim contrary light relative to sun/shadows.">
+                Fill Dir X <input type="range" id="fill-dir-x" min="-1" max="1" step="0.05" value="-0.4" />
+                Y <input type="range" id="fill-dir-y" min="-1" max="1" step="0.05" value="0.6" />
+                Z <input type="range" id="fill-dir-z" min="-1" max="1" step="0.05" value="-0.3" />
+              </label>
+
+              <h3 class="subsection">Moon / candle</h3>
+              <label class="tip" data-tip="Moon elevation (can be below horizon when negative). Used in twilight chapters.">
+                Moon Elevation <input type="range" id="moon-elev" min="-0.5" max="1.2" step="0.01" value="-0.15" /><span id="moon-elev-val">-0.15</span>
+              </label>
+              <label class="tip" data-tip="Moon azimuth around the horizon.">
+                Moon Azimuth <input type="range" id="moon-az" min="0" max="6.28" step="0.05" value="2.5" /><span id="moon-az-val">2.5</span>
+              </label>
+              <label class="tip" data-tip="Moon contribution strength. 0 = off; small values for cool twilight fill.">
+                Moon Intensity <input type="range" id="moon-int" min="0" max="1" step="0.05" value="0" /><span id="moon-int-val">0</span>
+              </label>
+              <label class="tip" data-tip="Local warm point/candle-like boost for twilight (§85). Not a full area light.">
+                Candle Intensity <input type="range" id="candle-int" min="0" max="1" step="0.05" value="0" /><span id="candle-int-val">0</span>
+              </label>
+              <label class="tip" data-tip="Warm/cool edge boost at atmosphere limbs (§155 flame-edge). Post/atmospheric accent, not a second sun.">
+                Flame Edge Boost <input type="range" id="flame-edge" min="0" max="1" step="0.05" value="0" /><span id="flame-edge-val">0</span>
+              </label>
+            </div>
+          </details>
+
+          <details class="panel-section">
+            <summary>Physiological / Goethe (advanced)</summary>
+            <div class="section-body">
+              <label class="tip" data-tip="Enable physiological simultaneous-contrast path (§56). Viewer-side opponent processing, not pigment in water.">
+                <input type="checkbox" id="physio-contrast" /> Physiological Contrast
+              </label>
+              <label class="tip" data-tip="Strength of opponent-channel (red↔green, blue↔yellow-style) push when physiological contrast is on.">
+                Opponent Strength <input type="range" id="opponent" min="0" max="1" step="0.05" value="0.4" /><span id="opponent-val">0.4</span>
+              </label>
+              <label class="tip" data-tip="§78 physiological: green/complement shadow boost as labeled post-process — not water pigment.">
+                Complement Strength <input type="range" id="complement-strength" min="0" max="1" step="0.05" value="0" /><span id="complement-strength-val">0</span>
+              </label>
+              <label class="tip" data-tip="§50 Afterimage: hold fixation then release. Enables fixation-strength path in the shader.">
+                <input type="checkbox" id="fixation-mode" /> Fixation Mode
+              </label>
+              <label class="tip" data-tip="How fast the afterimage residual decays after fixation. Higher = shorter afterimage.">
+                Afterimage Decay <input type="range" id="afterimage-decay" min="0" max="0.2" step="0.005" value="0.02" /><span id="afterimage-decay-val">0.02</span>
+              </label>
+              <label class="tip" data-tip="§224 weight of secondary reflection contribution (double reflection demo).">
+                Secondary Reflect <input type="range" id="secondary-reflect" min="0" max="1" step="0.05" value="0" /><span id="secondary-reflect-val">0</span>
+              </label>
+              <label class="tip" data-tip="Floor/plane reflectance for bounce light in double-reflect and land-side scenes.">
+                Floor Reflectance <input type="range" id="floor-refl" min="0" max="0.5" step="0.01" value="0.15" /><span id="floor-refl-val">0.15</span>
+              </label>
+            </div>
+          </details>
+
+          <details class="panel-section" open>
+            <summary>Scene / Cube</summary>
+            <div class="section-body">
+              <label class="tip" data-tip="World Y of the submerged dielectric test cube. Closer to surface = stronger caustic interaction.">
+                Cube Depth <input type="range" id="cube-depth" min="-4" max="-1" step="0.1" value="-2.2" /><span id="cube-depth-val">-2.2</span>
+              </label>
+              <label class="tip" data-tip="Cube angular speed about Y. Slower = less motion flicker during STILL accumulation (frozen when Animate is off).">
+                Cube Spin Y <input type="range" id="cube-spin-y" min="0" max="0.02" step="0.001" value="0.004" /><span id="cube-spin-y-val">0.004</span>
+              </label>
+              <label class="tip" data-tip="Cube angular speed about X. Frozen with Animate off so progressive path-trace can converge.">
+                Cube Spin X <input type="range" id="cube-spin-x" min="0" max="0.02" step="0.001" value="0.002" /><span id="cube-spin-x-val">0.002</span>
+              </label>
+            </div>
+          </details>
+
+          <details class="panel-section" open>
+            <summary>Camera</summary>
+            <div class="section-body">
+              <label class="tip" data-tip="Vertical field of view in degrees for the path-traced camera.">
+                FOV <input type="range" id="fov" min="35" max="90" step="1" value="55" /><span id="fov-val">55</span>
+              </label>
+              <label class="tip" data-tip="Max WASD fly speed (world units / s).">
+                Move Speed <input type="range" id="move-speed" min="0.3" max="4" step="0.1" value="1.2" /><span id="move-speed-val">1.2</span>
+              </label>
+              <label class="tip" data-tip="Acceleration when holding movement keys toward max speed.">
+                Move Accel <input type="range" id="move-accel" min="1" max="12" step="0.5" value="3.5" /><span id="move-accel-val">3.5</span>
+              </label>
+              <label class="tip" data-tip="Velocity damping when keys released — higher = stops sooner (less glide).">
+                Move Damping <input type="range" id="move-damping" min="1" max="20" step="0.5" value="6" /><span id="move-damping-val">6</span>
+              </label>
+              <label class="tip" data-tip="Mouse-drag look sensitivity (radians per pixel-ish).">
+                Mouse Sensitivity <input type="range" id="mouse-sens" min="0.0005" max="0.006" step="0.0001" value="0.0018" /><span id="mouse-sens-val">0.0018</span>
+              </label>
+            </div>
+          </details>
         </div>
 
         <div class="buttons">
-          <button id="view-above" class="tip" data-tip="Camera above the water surface looking down.">Above Water</button>
-          <button id="view-below" class="tip" data-tip="Camera below — Snell's window: sky only visible in the escape cone.">Below Water</button>
-          <button id="auto-orbit" class="tip" data-tip="Slow cinematic orbit (resets accumulation while moving).">Auto Orbit: OFF</button>
-          <button id="reset-accum" class="tip" data-tip="Clear sample buffer and restart convergence.">Reset Samples</button>
-          <button id="export-png" class="tip" data-tip="Save current frame as PNG.">Export PNG</button>
+          <button id="view-above" class="tip" data-tip="Place camera above the water surface looking down at the interface and cube.">Above Water</button>
+          <button id="view-below" class="tip" data-tip="Place camera below — Snell's window: sky only in the critical escape cone; outside is TIR.">Below Water</button>
+          <button id="auto-orbit" class="tip" data-tip="Slow cinematic orbit. Motion resets accumulation while the camera moves.">Auto Orbit: OFF</button>
+          <button id="reset-accum" class="tip" data-tip="Clear the progressive sample buffer and restart STILL convergence (or refresh LIVE).">Reset Samples</button>
+          <button id="export-png" class="tip" data-tip="Download the current displayed frame as a PNG.">Export PNG</button>
         </div>
 
         <div class="info">

@@ -89,7 +89,7 @@ header h1 {
   line-height: 1.4;
 }
 
-.goethe-section h3.subsection {
+h3.subsection {
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -156,9 +156,49 @@ label select {
 }
 
 .panel-section {
-  margin-bottom: 12px;
-  padding-bottom: 10px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
   border-bottom: 1px solid rgba(100, 140, 180, 0.12);
+}
+
+.panel-section > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #5a8aaa;
+  margin-bottom: 0;
+  padding: 4px 0;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.panel-section > summary::before {
+  content: '▸';
+  display: inline-block;
+  font-size: 9px;
+  color: #4a7a9a;
+  transition: transform 0.12s ease;
+  width: 10px;
+}
+
+.panel-section[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.panel-section[open] > summary {
+  margin-bottom: 8px;
+}
+
+.panel-section .section-body {
+  padding-left: 2px;
 }
 
 .panel-section h2 {
@@ -167,6 +207,39 @@ label select {
   letter-spacing: 0.08em;
   color: #5a8aaa;
   margin-bottom: 8px;
+}
+
+.chapter-btn.tip {
+  position: relative;
+}
+
+.chapter-btn.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  width: 220px;
+  padding: 8px 10px;
+  background: rgba(15, 25, 38, 0.96);
+  border: 1px solid rgba(100, 160, 220, 0.35);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #c8d8e8;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 100;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  text-align: left;
+}
+
+.chapter-btn.tip:hover::after {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 label {
