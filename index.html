@@ -109,13 +109,13 @@
           <details class="panel-section" open>
             <summary>Wave Topology</summary>
             <div class="section-body">
-              <label class="tip" data-tip="Legacy macro amplitude. On Ocean multi-octave: rebuilds 4 directional octaves (amp×0.52 each). On Single/Standing: sets primary component amplitude. Custom: does not rewrite your component list — edit components below. Tilts normals and changes TIR escape angles.">
-                Wave Amplitude <input type="range" id="wave-amp" min="0" max="0.25" step="0.005" value="0.08" /><span id="wave-amp-val">0.08</span>
+              <label class="tip" data-tip="Legacy macro amplitude (max 0.12). Ocean multi-octave: rebuilds 4 directional octaves (amp×0.52 each) then scales so total peak ≤0.22 and |A|·k ≤0.35. Single/Standing: primary amplitude. Named presets set their own macros. Custom: does not rewrite components — edit below. Tilts normals and TIR escape angles.">
+                Wave Amplitude <input type="range" id="wave-amp" min="0" max="0.12" step="0.005" value="0.08" /><span id="wave-amp-val">0.08</span>
               </label>
-              <label class="tip" data-tip="Legacy macro spatial frequency. Multi-octave rebuilds octave k-scales (freq×1.85). Single/Standing: primary k. Custom: leave components as-is.">
+              <label class="tip" data-tip="Legacy macro spatial frequency. Multi-octave rebuilds octave k-scales (freq×1.85). Single/Standing: primary k. Named static presets: macros are labels only until you re-select the preset. Custom: leave components as-is.">
                 Wave Frequency <input type="range" id="wave-freq" min="0.2" max="1.5" step="0.05" value="0.5" /><span id="wave-freq-val">0.5</span>
               </label>
-              <label class="tip" data-tip="Legacy macro phase speed (ω scale, before Time Scale). Multi-octave bakes per-octave speed factors. Single/Standing: primary ω. Custom: components unchanged.">
+              <label class="tip" data-tip="Legacy macro phase speed (ω scale, before Time Scale). Multi-octave bakes per-octave speed factors. Single/Standing: primary ω. Custom / named static: components unchanged.">
                 Wave Speed <input type="range" id="wave-spd" min="0.1" max="2" step="0.05" value="0.6" /><span id="wave-spd-val">0.6</span>
               </label>
               <label class="tip" data-tip="Multiplier on wave + cube motion when LIVE. Does not advance sim time when Animate is off (STILL freeze).">
@@ -126,14 +126,22 @@
               </label>
 
               <details class="nested-section">
-                <summary class="tip" data-tip="Edit the sum of up to 4 sine components that define surface height h(p,t). Normals use analytic derivatives of the same sum — honest Snell/TIR topology, not painted foam.">Wave Advanced</summary>
+                <summary class="tip" data-tip="Edit the sum of up to 4 sine components that define surface height h(p,t). Normals use analytic derivatives of the same sum — honest Snell/TIR topology, not painted foam. Budgets: per-comp A≤0.12, Σ|A|≤0.22, |A|·freq≤0.35 (CPU clamp on every edit/pack).">Wave Advanced</summary>
                 <div class="nested-body">
-                  <label class="tip" data-tip="Ocean multi-octave: 4 traveling sines with legacy octave ratios (default look). Single sine: one traveling wave. Standing: A·sin(k·p+φ)·cos(ωt) — nodes/antinodes, no net propagation. Custom: free edit of the component list (editing any field switches here).">
+                  <label class="tip" data-tip="Named seas load fixed moderate-amp builders + macro labels. Ocean multi-octave uses macros (legacy ratios, then sanitize). Single/Standing use macros for primary. Custom: free edit (editing any field switches here).">
                     Wave Preset
                     <select id="wave-preset">
                       <option value="multi-octave">Ocean multi-octave</option>
                       <option value="single-sine">Single sine</option>
                       <option value="standing">Standing wave</option>
+                      <option value="calm">Calm swell</option>
+                      <option value="long-swell">Long swell</option>
+                      <option value="chop">Chop</option>
+                      <option value="cross-sea">Cross sea</option>
+                      <option value="opposing">Opposing seas</option>
+                      <option value="ripple">Ripple</option>
+                      <option value="dual-standing">Dual standing</option>
+                      <option value="flat">Flat (mirror)</option>
                       <option value="custom">Custom</option>
                     </select>
                   </label>
@@ -141,8 +149,8 @@
                     Component
                     <select id="wave-comp-index"></select>
                   </label>
-                  <label class="tip" data-tip="Component amplitude A. Height contribution A·sin(…). Zero flattens this mode.">
-                    Comp Amp <input type="range" id="wave-comp-amp" min="0" max="0.5" step="0.005" value="0.08" /><span id="wave-comp-amp-val">0.08</span>
+                  <label class="tip" data-tip="Component amplitude A (max 0.12). Height A·sin(…). Total peak budget Σ|A|≤0.22 and slope |A|·freq≤0.35 applied after edit — values may scale down slightly.">
+                    Comp Amp <input type="range" id="wave-comp-amp" min="0" max="0.12" step="0.005" value="0.08" /><span id="wave-comp-amp-val">0.08</span>
                   </label>
                   <label class="tip" data-tip="Spatial frequency scale: wave vector k = f · (cos θ, sin θ). Multi-octave harmonics can reach ~9+.">
                     Comp Freq <input type="range" id="wave-comp-freq" min="0.05" max="12" step="0.05" value="0.5" /><span id="wave-comp-freq-val">0.5</span>

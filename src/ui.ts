@@ -2,6 +2,7 @@ import { CHAPTERS, WATER_PRESETS, type ChapterId } from './chapters';
 import {
   PathTracer,
   MAX_WAVE_COMPONENTS,
+  WAVE_AMP_MAX,
   cloneWaveComponent,
   type AbsorptionModel,
   type WaveComponent,
@@ -219,14 +220,36 @@ function bindWaveMacroSlider(
   if (!slider || !valEl) return;
   const fmt = (v: number) => v.toFixed(decimals);
   slider.addEventListener('input', () => {
-    const v = parseFloat(slider.value);
+    let v = parseFloat(slider.value);
+    if (key === 'waveAmplitude') {
+      v = Math.min(WAVE_AMP_MAX, Math.max(0, v));
+      slider.value = String(v);
+    }
     tracer.params[key] = v;
     valEl.textContent = fmt(v);
     tracer.syncWaveComponentsFromMacros();
+    // Keep amp/slope budgets even when macros do not rebuild (custom / named static).
+    tracer.sanitizeWaves();
     syncWaveAdvancedUI(tracer);
+    // Macro amp/freq/spd labels may change when named preset re-selected; keep macros in UI
+    applyWaveMacroLabels(tracer);
     tracer.markSceneChanged();
   });
   valEl.textContent = fmt(parseFloat(slider.value));
+}
+
+/** Sync only the three wave macro sliders/labels from params. */
+function applyWaveMacroLabels(tracer: PathTracer): void {
+  const set = (id: string, val: number, valId: string, decimals: number) => {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    if (el) el.value = String(val);
+    const v = document.getElementById(valId);
+    if (v) v.textContent = val.toFixed(decimals);
+  };
+  const p = tracer.params;
+  set('wave-amp', p.waveAmplitude, 'wave-amp-val', 3);
+  set('wave-freq', p.waveFrequency, 'wave-freq-val', 2);
+  set('wave-spd', p.waveSpeed, 'wave-spd-val', 2);
 }
 
 function setupWaveAdvancedUI(tracer: PathTracer): void {
@@ -257,6 +280,7 @@ function setupWaveAdvancedUI(tracer: PathTracer): void {
     if (!c) return;
     mutator(c);
     tracer.markWaveComponentsCustom();
+    tracer.sanitizeWaves();
     syncWaveAdvancedUI(tracer);
     tracer.markSceneChanged();
   };
@@ -269,6 +293,7 @@ function setupWaveAdvancedUI(tracer: PathTracer): void {
   presetEl.addEventListener('change', () => {
     tracer.setWavePreset(presetEl.value as WavePreset);
     selectedWaveCompIndex = 0;
+    applyWaveMacroLabels(tracer);
     syncWaveAdvancedUI(tracer);
     tracer.markSceneChanged();
   });
@@ -320,7 +345,7 @@ function setupWaveAdvancedUI(tracer: PathTracer): void {
   });
 
   addBtn?.addEventListener('click', () => {
-    tracer.clampWaveComponents();
+    tracer.sanitizeWaves();
     const comps = tracer.params.waveComponents;
     if (comps.length >= MAX_WAVE_COMPONENTS) return;
     const last = comps[comps.length - 1];
@@ -331,18 +356,20 @@ function setupWaveAdvancedUI(tracer: PathTracer): void {
     next.frequency *= 1.4;
     comps.push(next);
     tracer.markWaveComponentsCustom();
+    tracer.sanitizeWaves();
     selectedWaveCompIndex = comps.length - 1;
     syncWaveAdvancedUI(tracer);
     tracer.markSceneChanged();
   });
 
   removeBtn?.addEventListener('click', () => {
-    tracer.clampWaveComponents();
+    tracer.sanitizeWaves();
     const comps = tracer.params.waveComponents;
     if (comps.length <= 1) return;
     comps.splice(selectedWaveCompIndex, 1);
     selectedWaveCompIndex = Math.min(selectedWaveCompIndex, comps.length - 1);
     tracer.markWaveComponentsCustom();
+    tracer.sanitizeWaves();
     syncWaveAdvancedUI(tracer);
     tracer.markSceneChanged();
   });
@@ -367,7 +394,7 @@ function syncWaveAdvancedUI(tracer: PathTracer): void {
     return;
   }
 
-  tracer.clampWaveComponents();
+  tracer.sanitizeWaves();
   const comps = tracer.params.waveComponents;
   selectedWaveCompIndex = Math.max(0, Math.min(selectedWaveCompIndex, comps.length - 1));
 

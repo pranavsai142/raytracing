@@ -18,15 +18,65 @@ export interface WaveComponent {
   standing: boolean;
 }
 
-export type WavePreset = 'multi-octave' | 'single-sine' | 'standing' | 'custom';
+export type WavePreset =
+  | 'multi-octave'
+  | 'single-sine'
+  | 'standing'
+  | 'calm'
+  | 'long-swell'
+  | 'chop'
+  | 'cross-sea'
+  | 'opposing'
+  | 'ripple'
+  | 'dual-standing'
+  | 'flat'
+  | 'custom';
 
 export const MAX_WAVE_COMPONENTS = 4;
+
+/** Per-component / macro amplitude hard max (CPU + UI). */
+export const WAVE_AMP_MAX = 0.12;
+/** Sum of |amp| across components must stay ≤ this (scale down if over). */
+export const WAVE_TOTAL_AMP_BUDGET = 0.22;
+/** Per-component |amp|·frequency slope budget (reduce amp if needed). */
+export const WAVE_SLOPE_BUDGET = 0.35;
+
+/**
+ * Clamp component amplitudes for sane surface normals / Snell:
+ * 1) each |amp| ≤ WAVE_AMP_MAX
+ * 2) sum |amp| ≤ WAVE_TOTAL_AMP_BUDGET (proportional scale)
+ * 3) |amp|·freq ≤ WAVE_SLOPE_BUDGET per component (after total budget)
+ */
+export function sanitizeWaveComponents(comps: WaveComponent[]): WaveComponent[] {
+  const out = comps.map((c) => ({
+    ...c,
+    amplitude: Math.min(WAVE_AMP_MAX, Math.max(0, c.amplitude)),
+    frequency: Math.max(0, c.frequency),
+  }));
+
+  let sum = 0;
+  for (const c of out) sum += Math.abs(c.amplitude);
+  if (sum > WAVE_TOTAL_AMP_BUDGET && sum > 0) {
+    const scale = WAVE_TOTAL_AMP_BUDGET / sum;
+    for (const c of out) c.amplitude *= scale;
+  }
+
+  for (const c of out) {
+    const freq = Math.abs(c.frequency);
+    if (freq > 0 && Math.abs(c.amplitude) * freq > WAVE_SLOPE_BUDGET) {
+      c.amplitude = Math.min(WAVE_AMP_MAX, WAVE_SLOPE_BUDGET / freq);
+    }
+  }
+
+  return out;
+}
 
 /**
  * Rebuild the legacy 4-octave ocean as explicit components.
  * Matches pathTracer.frag historical ratios: amp*=0.52, freq*=1.85, spd*=1.05,
  * angles i*1.3+0.7 with dir normalize(cos(ang), sin(ang*0.6)), and per-octave
  * temporal factor (0.9 + i*0.15) baked into each component's speed.
+ * Result is sanitized (amp/slope budgets) so maxed macros cannot blow up slopes.
  */
 export function buildMultiOctaveComponents(
   baseAmp: number,
@@ -34,7 +84,7 @@ export function buildMultiOctaveComponents(
   baseSpd: number,
 ): WaveComponent[] {
   const comps: WaveComponent[] = [];
-  let amp = baseAmp;
+  let amp = Math.min(WAVE_AMP_MAX, Math.max(0, baseAmp));
   let freq = baseFreq;
   let spd = baseSpd;
   for (let i = 0; i < MAX_WAVE_COMPONENTS; i++) {
@@ -59,7 +109,7 @@ export function buildMultiOctaveComponents(
     freq *= 1.85;
     spd *= 1.05;
   }
-  return comps;
+  return sanitizeWaveComponents(comps);
 }
 
 export function buildSingleSineComponent(
@@ -94,6 +144,178 @@ export function buildStandingComponent(
 
 export function cloneWaveComponent(c: WaveComponent): WaveComponent {
   return { ...c };
+}
+
+/** Named preset component lists (excluding multi-octave / single-sine / standing / custom). */
+export function buildNamedPresetComponents(preset: WavePreset): WaveComponent[] | null {
+  switch (preset) {
+    case 'calm':
+      return [
+        {
+          amplitude: 0.02,
+          frequency: 0.35,
+          speed: 0.4,
+          directionDeg: 15,
+          phase: 0,
+          standing: false,
+        },
+      ];
+    case 'long-swell':
+      return [
+        {
+          amplitude: 0.06,
+          frequency: 0.25,
+          speed: 0.45,
+          directionDeg: 20,
+          phase: 0,
+          standing: false,
+        },
+        {
+          amplitude: 0.035,
+          frequency: 0.32,
+          speed: 0.5,
+          directionDeg: 35,
+          phase: 0.4,
+          standing: false,
+        },
+      ];
+    case 'chop':
+      return [
+        {
+          amplitude: 0.025,
+          frequency: 1.2,
+          speed: 1.1,
+          directionDeg: 0,
+          phase: 0,
+          standing: false,
+        },
+        {
+          amplitude: 0.022,
+          frequency: 1.8,
+          speed: 1.3,
+          directionDeg: 55,
+          phase: 0.7,
+          standing: false,
+        },
+        {
+          amplitude: 0.018,
+          frequency: 2.5,
+          speed: 1.5,
+          directionDeg: 130,
+          phase: 1.4,
+          standing: false,
+        },
+      ];
+    case 'cross-sea':
+      return [
+        {
+          amplitude: 0.05,
+          frequency: 0.5,
+          speed: 0.55,
+          directionDeg: 0,
+          phase: 0,
+          standing: false,
+        },
+        {
+          amplitude: 0.04,
+          frequency: 0.7,
+          speed: 0.65,
+          directionDeg: 90,
+          phase: 0.3,
+          standing: false,
+        },
+      ];
+    case 'opposing':
+      return [
+        {
+          amplitude: 0.05,
+          frequency: 0.55,
+          speed: 0.6,
+          directionDeg: 0,
+          phase: 0,
+          standing: false,
+        },
+        {
+          amplitude: 0.05,
+          frequency: 0.55,
+          speed: 0.6,
+          directionDeg: 180,
+          phase: 0,
+          standing: false,
+        },
+      ];
+    case 'ripple':
+      return [
+        {
+          amplitude: 0.015,
+          frequency: 2.5,
+          speed: 1.8,
+          directionDeg: 30,
+          phase: 0,
+          standing: false,
+        },
+      ];
+    case 'dual-standing':
+      return [
+        {
+          amplitude: 0.04,
+          frequency: 0.6,
+          speed: 0.5,
+          directionDeg: 0,
+          phase: 0,
+          standing: true,
+        },
+        {
+          amplitude: 0.04,
+          frequency: 0.75,
+          speed: 0.55,
+          directionDeg: 60,
+          phase: 0.5,
+          standing: true,
+        },
+      ];
+    case 'flat':
+      return [
+        {
+          amplitude: 0,
+          frequency: 0.5,
+          speed: 0.6,
+          directionDeg: 0,
+          phase: 0,
+          standing: false,
+        },
+      ];
+    default:
+      return null;
+  }
+}
+
+/** Sensible macro labels for named static presets (primary amp/freq/spd). */
+function macrosForNamedPreset(preset: WavePreset): {
+  amp: number;
+  freq: number;
+  spd: number;
+} | null {
+  switch (preset) {
+    case 'calm':
+      return { amp: 0.02, freq: 0.35, spd: 0.4 };
+    case 'long-swell':
+      return { amp: 0.06, freq: 0.25, spd: 0.45 };
+    case 'chop':
+      return { amp: 0.025, freq: 1.2, spd: 1.1 };
+    case 'cross-sea':
+      return { amp: 0.05, freq: 0.5, spd: 0.55 };
+    case 'opposing':
+      return { amp: 0.05, freq: 0.55, spd: 0.6 };
+    case 'ripple':
+      return { amp: 0.015, freq: 2.5, spd: 1.8 };
+    case 'dual-standing':
+      return { amp: 0.04, freq: 0.6, spd: 0.5 };
+    case 'flat':
+      return { amp: 0, freq: 0.5, spd: 0.6 };
+    default:
+      return null;
+  }
 }
 
 export interface SimParams {
@@ -546,41 +768,52 @@ export class PathTracer {
    * Rebuild waveComponents from legacy macro knobs according to wavePreset.
    * - multi-octave: full 4-octave rebuild (legacy fidelity)
    * - single-sine / standing: primary from macros; optionally keep dir/phase
-   * - custom: no-op (user owns the list)
+   * - named static presets + custom: no-op (user owns the list / fixed builder)
    */
   private rebuildWaveFromMacros(preservePrimaryMeta: boolean): void {
-    const { waveAmplitude: amp, waveFrequency: freq, waveSpeed: spd, wavePreset } = this.params;
-    if (wavePreset === 'custom') return;
+    const { waveAmplitude: rawAmp, waveFrequency: freq, waveSpeed: spd, wavePreset } = this.params;
+    const amp = Math.min(WAVE_AMP_MAX, Math.max(0, rawAmp));
+    this.params.waveAmplitude = amp;
 
     if (wavePreset === 'multi-octave') {
       this.params.waveComponents = buildMultiOctaveComponents(amp, freq, spd);
+      this.sanitizeWaves();
       return;
     }
 
-    const standing = wavePreset === 'standing';
-    const base = standing
-      ? buildStandingComponent(amp, freq, spd)
-      : buildSingleSineComponent(amp, freq, spd);
-    if (preservePrimaryMeta) {
-      const prev = this.params.waveComponents[0];
-      if (prev) {
-        base.directionDeg = prev.directionDeg;
-        base.phase = prev.phase;
+    if (wavePreset === 'single-sine' || wavePreset === 'standing') {
+      const standing = wavePreset === 'standing';
+      const base = standing
+        ? buildStandingComponent(amp, freq, spd)
+        : buildSingleSineComponent(amp, freq, spd);
+      if (preservePrimaryMeta) {
+        const prev = this.params.waveComponents[0];
+        if (prev) {
+          base.directionDeg = prev.directionDeg;
+          base.phase = prev.phase;
+        }
       }
+      base.standing = standing;
+      this.params.waveComponents = [base];
+      this.sanitizeWaves();
+      return;
     }
-    base.standing = standing;
-    this.params.waveComponents = [base];
+
+    // custom + named static presets: macros do not rewrite components
   }
 
   /**
-   * Macro slider path: rebuild components for the active non-custom preset.
+   * Macro slider path: rebuild components for multi-octave / single-sine / standing.
    * Preserves primary dir/phase for single-sine / standing.
    */
   syncWaveComponentsFromMacros(): void {
     this.rebuildWaveFromMacros(true);
   }
 
-  /** Apply a named preset, overwriting components (except custom, which only flips the label). */
+  /**
+   * Apply a named preset. Named (non-custom) presets overwrite components and set
+   * macros to sensible UI labels. Always sanitizes amp/slope budgets.
+   */
   setWavePreset(preset: WavePreset): void {
     this.params.wavePreset = preset;
     if (preset === 'custom') {
@@ -594,9 +827,49 @@ export class PathTracer {
           ),
         ];
       }
+      this.sanitizeWaves();
       return;
     }
-    this.rebuildWaveFromMacros(false);
+
+    if (preset === 'multi-octave') {
+      this.params.waveAmplitude = Math.min(WAVE_AMP_MAX, Math.max(0, this.params.waveAmplitude));
+      this.params.waveComponents = buildMultiOctaveComponents(
+        this.params.waveAmplitude,
+        this.params.waveFrequency,
+        this.params.waveSpeed,
+      );
+      this.sanitizeWaves();
+      return;
+    }
+
+    if (preset === 'single-sine' || preset === 'standing') {
+      this.params.waveAmplitude = Math.min(WAVE_AMP_MAX, Math.max(0, this.params.waveAmplitude));
+      this.params.waveComponents = [
+        preset === 'standing'
+          ? buildStandingComponent(
+              this.params.waveAmplitude,
+              this.params.waveFrequency,
+              this.params.waveSpeed,
+            )
+          : buildSingleSineComponent(
+              this.params.waveAmplitude,
+              this.params.waveFrequency,
+              this.params.waveSpeed,
+            ),
+      ];
+      this.sanitizeWaves();
+      return;
+    }
+
+    const named = buildNamedPresetComponents(preset);
+    const macros = macrosForNamedPreset(preset);
+    if (named && macros) {
+      this.params.waveAmplitude = macros.amp;
+      this.params.waveFrequency = macros.freq;
+      this.params.waveSpeed = macros.spd;
+      this.params.waveComponents = named;
+    }
+    this.sanitizeWaves();
   }
 
   /** Mark components dirty → preset becomes custom (user edited a field). */
@@ -604,8 +877,12 @@ export class PathTracer {
     this.params.wavePreset = 'custom';
   }
 
-  /** Clamp and ensure waveComponents length is in [1, MAX_WAVE_COMPONENTS]. */
-  clampWaveComponents(): void {
+  /**
+   * Ensure length in [1, MAX_WAVE_COMPONENTS], clamp macro amp, and apply
+   * per-component amp / total peak / slope budgets.
+   */
+  sanitizeWaves(): void {
+    this.params.waveAmplitude = Math.min(WAVE_AMP_MAX, Math.max(0, this.params.waveAmplitude));
     let comps = this.params.waveComponents;
     if (comps.length > MAX_WAVE_COMPONENTS) {
       comps = comps.slice(0, MAX_WAVE_COMPONENTS);
@@ -619,10 +896,16 @@ export class PathTracer {
         ),
       ];
     }
-    this.params.waveComponents = comps;
+    this.params.waveComponents = sanitizeWaveComponents(comps);
+  }
+
+  /** Alias for sanitizeWaves (length + amp/slope budgets). */
+  clampWaveComponents(): void {
+    this.sanitizeWaves();
   }
 
   private packWaveUniforms(): void {
+    this.sanitizeWaves();
     const u = this.material.uniforms;
     const comps = this.params.waveComponents;
     const n = Math.min(MAX_WAVE_COMPONENTS, Math.max(0, comps.length));
