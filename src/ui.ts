@@ -111,7 +111,9 @@ export function setupUI(tracer: PathTracer): void {
   animateWaves?.addEventListener('change', () => {
     // Critical: freeze freezes waves AND cube so progressive path-trace can converge.
     // LIVE mode never blends history (avoids spotty ghost caustics).
+    // setAnimateScene(false) also forces autoOrbit off — keep the button in sync.
     tracer.setAnimateScene(animateWaves.checked);
+    syncAutoOrbitButton(tracer);
   });
 
   const physio = document.getElementById('physio-contrast') as HTMLInputElement;
@@ -146,8 +148,12 @@ export function setupUI(tracer: PathTracer): void {
 
   btnOrbit.addEventListener('click', () => {
     tracer.params.autoOrbit = !tracer.params.autoOrbit;
-    btnOrbit.textContent = `Auto Orbit: ${tracer.params.autoOrbit ? 'ON' : 'OFF'}`;
-    btnOrbit.classList.toggle('active', tracer.params.autoOrbit);
+    // Orbit only advances in LIVE mode — enabling Auto Orbit turns Animate ON so state matches.
+    if (tracer.params.autoOrbit && !tracer.params.animateWaves) {
+      tracer.setAnimateScene(true);
+      if (animateWaves) animateWaves.checked = true;
+    }
+    syncAutoOrbitButton(tracer);
     tracer.markSceneChanged();
   });
 
@@ -403,6 +409,17 @@ function syncWaveAdvancedUI(tracer: PathTracer): void {
   if (removeBtn) removeBtn.disabled = comps.length <= 1;
 }
 
+/** Sync Auto Orbit button text/class from `tracer.params.autoOrbit`. */
+export function syncAutoOrbitButton(tracer: PathTracer): void {
+  const btnOrbit = document.getElementById('auto-orbit');
+  if (!btnOrbit) return;
+  btnOrbit.textContent = `Auto Orbit: ${tracer.params.autoOrbit ? 'ON' : 'OFF'}`;
+  btnOrbit.classList.toggle('active', tracer.params.autoOrbit);
+}
+
+/** Alias for main.ts freeze / setAnimateScene API paths. */
+export const syncOrbitUI = syncAutoOrbitButton;
+
 /** Full UI resync from tracer.params (chapter load / external API). */
 export function applyParamsToUI(tracer: PathTracer): void {
   const set = (id: string, val: number, valId?: string, decimals?: number) => {
@@ -493,11 +510,7 @@ export function applyParamsToUI(tracer: PathTracer): void {
   const fixation = document.getElementById('fixation-mode') as HTMLInputElement | null;
   if (fixation) fixation.checked = p.fixationMode;
 
-  const btnOrbit = document.getElementById('auto-orbit');
-  if (btnOrbit) {
-    btnOrbit.textContent = `Auto Orbit: ${p.autoOrbit ? 'ON' : 'OFF'}`;
-    btnOrbit.classList.toggle('active', p.autoOrbit);
-  }
+  syncAutoOrbitButton(tracer);
 
   const btnAbove = document.getElementById('view-above');
   const btnBelow = document.getElementById('view-below');

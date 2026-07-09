@@ -1,7 +1,7 @@
 import { PathTracer } from './PathTracer';
 import type { ChapterId } from './chapters';
 import { setupCameraControls } from './cameraControls';
-import { applyParamsToUI, setupUI } from './ui';
+import { applyParamsToUI, setupUI, syncOrbitUI } from './ui';
 
 const statsEl = document.getElementById('stats');
 
@@ -46,6 +46,7 @@ try {
       tracer.freezeForCapture();
       const cb = document.getElementById('animate-waves') as HTMLInputElement | null;
       if (cb) cb.checked = false;
+      syncOrbitUI(tracer);
     },
     unfreezeLive: () => {
       tracer.unfreezeLive();
@@ -56,6 +57,7 @@ try {
       tracer.setAnimateScene(on);
       const cb = document.getElementById('animate-waves') as HTMLInputElement | null;
       if (cb) cb.checked = on;
+      syncOrbitUI(tracer);
     },
     applyChapter: (id) => {
       tracer.applyChapterPreset(id);
