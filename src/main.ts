@@ -5,7 +5,7 @@ import { applyParamsToUI, setupUI } from './ui';
 
 const statsEl = document.getElementById('stats');
 
-/** Playtest / Playwright surface — north-star visual smoke uses this. */
+/** Playtest / Playwright surface — north-star / Goethe visual smoke uses this. */
 export interface OceanscapeAPI {
   tracer: PathTracer;
   ready: boolean;
@@ -17,6 +17,8 @@ export interface OceanscapeAPI {
   getMode: () => 'live' | 'still';
   getSamples: () => number;
   getStats: () => string;
+  /** Current chapter id, badge text, and caption from DOM (for smoke reports). */
+  getChapterInfo: () => { id: string; badge: string; caption: string };
   waitForSamples: (target: number, timeoutMs?: number) => Promise<{ samples: number; mode: string; ok: boolean }>;
   exportPNG: () => string;
 }
@@ -66,6 +68,15 @@ try {
     getMode: () => tracer.getRenderMode(),
     getSamples: () => tracer.getAccumSampleCount(),
     getStats: () => tracer.getStats(),
+    getChapterInfo: () => {
+      const badge = (document.getElementById('chapter-badge')?.textContent || '').trim();
+      const caption = (document.getElementById('chapter-caption')?.textContent || '').trim();
+      return {
+        id: tracer.params.activeChapter,
+        badge: badge || tracer.getChapterBadge(),
+        caption,
+      };
+    },
     waitForSamples: (target, timeoutMs = 20000) =>
       new Promise((resolve) => {
         const start = performance.now();

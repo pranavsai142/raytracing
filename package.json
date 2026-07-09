@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "deploy": "npm run build && npx gh-pages -d dist",
     "smoke": "BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/visual-smoke.mjs",
-    "smoke:headed": "HEADED=1 BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/visual-smoke.mjs"
+    "smoke:headed": "HEADED=1 BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/visual-smoke.mjs",
+    "smoke:goethe": "BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/goethe-smoke.mjs",
+    "smoke:goethe:headed": "HEADED=1 BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/goethe-smoke.mjs"
   },
   "dependencies": {
     "three": "^0.170.0"
