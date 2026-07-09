@@ -368,7 +368,6 @@ function syncWaveAdvancedUI(tracer: PathTracer): void {
   presetEl.value = tracer.params.wavePreset;
 
   // Rebuild index options
-  const prevFocus = document.activeElement;
   indexEl.innerHTML = '';
   for (let i = 0; i < comps.length; i++) {
     const opt = document.createElement('option');
@@ -402,11 +401,6 @@ function syncWaveAdvancedUI(tracer: PathTracer): void {
 
   if (addBtn) addBtn.disabled = comps.length >= MAX_WAVE_COMPONENTS;
   if (removeBtn) removeBtn.disabled = comps.length <= 1;
-
-  // Avoid stealing focus while typing/dragging
-  if (prevFocus instanceof HTMLElement && document.contains(prevFocus)) {
-    // no-op; select rebuild may have blurred — acceptable on sync
-  }
 }
 
 /** Full UI resync from tracer.params (chapter load / external API). */

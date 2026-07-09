@@ -142,13 +142,13 @@
                     <select id="wave-comp-index"></select>
                   </label>
                   <label class="tip" data-tip="Component amplitude A. Height contribution A·sin(…). Zero flattens this mode.">
-                    Comp Amp <input type="range" id="wave-comp-amp" min="0" max="0.25" step="0.005" value="0.08" /><span id="wave-comp-amp-val">0.08</span>
+                    Comp Amp <input type="range" id="wave-comp-amp" min="0" max="0.5" step="0.005" value="0.08" /><span id="wave-comp-amp-val">0.08</span>
                   </label>
-                  <label class="tip" data-tip="Spatial frequency scale: wave vector k = f · (cos θ, sin θ). Higher f = shorter wavelength, sharper normal tilts.">
-                    Comp Freq <input type="range" id="wave-comp-freq" min="0.05" max="3" step="0.05" value="0.5" /><span id="wave-comp-freq-val">0.5</span>
+                  <label class="tip" data-tip="Spatial frequency scale: wave vector k = f · (cos θ, sin θ). Multi-octave harmonics can reach ~9+.">
+                    Comp Freq <input type="range" id="wave-comp-freq" min="0.05" max="12" step="0.05" value="0.5" /><span id="wave-comp-freq-val">0.5</span>
                   </label>
-                  <label class="tip" data-tip="Temporal frequency ω (phase speed scale). Traveling: phase advances as −ωt. Standing: envelope cos(ωt). Multiplied by Time Scale in LIVE.">
-                    Comp Speed <input type="range" id="wave-comp-spd" min="0" max="3" step="0.05" value="0.6" /><span id="wave-comp-spd-val">0.6</span>
+                  <label class="tip" data-tip="Temporal frequency ω (phase speed scale). Multi-octave packed speeds can exceed 3. Multiplied by Time Scale in LIVE.">
+                    Comp Speed <input type="range" id="wave-comp-spd" min="0" max="6" step="0.05" value="0.6" /><span id="wave-comp-spd-val">0.6</span>
                   </label>
                   <label class="tip" data-tip="Propagation direction in the XZ plane (degrees). k points along this angle; crests travel that way for traveling modes.">
                     Direction ° <input type="range" id="wave-comp-dir" min="0" max="360" step="1" value="0" /><span id="wave-comp-dir-val">0</span>

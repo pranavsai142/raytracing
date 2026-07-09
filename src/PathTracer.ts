@@ -356,6 +356,9 @@ export class PathTracer {
     this.params.candleIntensity = 0;
     this.params.secondaryReflectWeight = 0;
 
+    /** When a chapter sets waveAmplitude, force multi-octave so GPU height matches (custom is otherwise a no-op). */
+    let waveMacrosTouched = false;
+
     switch (id) {
       case 'ocean':
         this.params.underwaterView = true;
@@ -421,6 +424,7 @@ export class PathTracer {
         this.params.interfaceRoughness = 0.02;
         this.params.maxBounces = 8;
         this.params.waveAmplitude = 0.06;
+        waveMacrosTouched = true;
         this.params.underwaterView = true;
         // Closer + slightly up: cube + wave surface caustics in one frame
         this.cameraPos.set(0, -0.55, 3.2);
@@ -429,6 +433,7 @@ export class PathTracer {
 
       case 'double-reflect':
         this.params.waveAmplitude = 0;
+        waveMacrosTouched = true;
         this.params.secondaryReflectWeight = 0.4;
         this.params.floorReflectance = 0.2;
         this.params.underwaterView = false;
@@ -464,6 +469,7 @@ export class PathTracer {
         this.params.dispersion = 0.008;
         this.params.sunElevation = 0.7;
         this.params.waveAmplitude = 0.02;
+        waveMacrosTouched = true;
         this.params.cubeDepth = -2.2;
         this.params.exposure = 1.2;
         this.params.underwaterView = false;
@@ -496,6 +502,7 @@ export class PathTracer {
         this.params.underwaterView = false;
         this.params.sunElevation = 0.2;
         this.params.waveAmplitude = 0.12;
+        waveMacrosTouched = true;
         this.params.interfaceRoughness = 0.02;
         this.params.complementStrength = 0.3;
         this.cameraPos.set(0, 0.5, 5);
@@ -514,6 +521,7 @@ export class PathTracer {
       case 'sun-glitter':
         this.params.sunElevation = 0.05;
         this.params.waveAmplitude = 0.1;
+        waveMacrosTouched = true;
         this.params.bloomStrength = 0.4;
         this.params.underwaterView = false;
         this.cameraPos.set(0, 0.8, 6);
@@ -525,19 +533,22 @@ export class PathTracer {
       window.location.hash = `chapter=${id}`;
     }
 
-    // Chapter presets often touch waveAmplitude; keep GPU components in sync for non-custom modes.
+    // Chapters that set waveAmplitude must own GPU height — leave custom only when untouched.
+    if (waveMacrosTouched) {
+      this.params.wavePreset = 'multi-octave';
+    }
     this.syncWaveComponentsFromMacros();
     this.onChapterChanged?.(id, def.badge);
     this.markSceneChanged();
   }
 
   /**
-   * Rebuild or scale waveComponents from legacy macro knobs according to wavePreset.
+   * Rebuild waveComponents from legacy macro knobs according to wavePreset.
    * - multi-octave: full 4-octave rebuild (legacy fidelity)
-   * - single-sine / standing: primary component amp/freq/speed from macros (dir/phase kept if present)
+   * - single-sine / standing: primary from macros; optionally keep dir/phase
    * - custom: no-op (user owns the list)
    */
-  syncWaveComponentsFromMacros(): void {
+  private rebuildWaveFromMacros(preservePrimaryMeta: boolean): void {
     const { waveAmplitude: amp, waveFrequency: freq, waveSpeed: spd, wavePreset } = this.params;
     if (wavePreset === 'custom') return;
 
@@ -547,16 +558,26 @@ export class PathTracer {
     }
 
     const standing = wavePreset === 'standing';
-    const prev = this.params.waveComponents[0];
     const base = standing
       ? buildStandingComponent(amp, freq, spd)
       : buildSingleSineComponent(amp, freq, spd);
-    if (prev) {
-      base.directionDeg = prev.directionDeg;
-      base.phase = prev.phase;
+    if (preservePrimaryMeta) {
+      const prev = this.params.waveComponents[0];
+      if (prev) {
+        base.directionDeg = prev.directionDeg;
+        base.phase = prev.phase;
+      }
     }
     base.standing = standing;
     this.params.waveComponents = [base];
+  }
+
+  /**
+   * Macro slider path: rebuild components for the active non-custom preset.
+   * Preserves primary dir/phase for single-sine / standing.
+   */
+  syncWaveComponentsFromMacros(): void {
+    this.rebuildWaveFromMacros(true);
   }
 
   /** Apply a named preset, overwriting components (except custom, which only flips the label). */
@@ -575,32 +596,7 @@ export class PathTracer {
       }
       return;
     }
-    if (preset === 'multi-octave') {
-      this.params.waveComponents = buildMultiOctaveComponents(
-        this.params.waveAmplitude,
-        this.params.waveFrequency,
-        this.params.waveSpeed,
-      );
-      return;
-    }
-    if (preset === 'single-sine') {
-      this.params.waveComponents = [
-        buildSingleSineComponent(
-          this.params.waveAmplitude,
-          this.params.waveFrequency,
-          this.params.waveSpeed,
-        ),
-      ];
-      return;
-    }
-    // standing
-    this.params.waveComponents = [
-      buildStandingComponent(
-        this.params.waveAmplitude,
-        this.params.waveFrequency,
-        this.params.waveSpeed,
-      ),
-    ];
+    this.rebuildWaveFromMacros(false);
   }
 
   /** Mark components dirty → preset becomes custom (user edited a field). */
@@ -712,9 +708,7 @@ export class PathTracer {
       sunIntensity: { value: 1.2 },
       volumeSigma: { value: 0.05 },
       volumeG: { value: 0.55 },
-      waveAmplitude: { value: 0.08 },
-      waveFrequency: { value: 0.5 },
-      waveSpeed: { value: 0.6 },
+      // Wave surface is fully driven by packed components (macros stay on SimParams only).
       waveCount: { value: 4 },
       waveCompA: {
         value: [
@@ -872,10 +866,9 @@ export class PathTracer {
     if (!this.params.animateWaves) return false;
     const cubeSpinning =
       Math.abs(this.params.cubeRotSpeedY) > 1e-6 || Math.abs(this.params.cubeRotSpeedX) > 1e-6;
+    // GPU height comes only from waveComponents — not the legacy macro knob.
     const anyWaveAmp = this.params.waveComponents.some((c) => Math.abs(c.amplitude) > 1e-5);
-    const wavesMoving =
-      this.params.timeScale > 1e-5 &&
-      (anyWaveAmp || Math.abs(this.params.waveAmplitude) > 1e-5);
+    const wavesMoving = this.params.timeScale > 1e-5 && anyWaveAmp;
     return cubeSpinning || wavesMoving || this.params.autoOrbit;
   }
 
@@ -948,9 +941,6 @@ export class PathTracer {
     u.temporalBlend.value = this.params.temporalBlend;
     u.exposure.value = this.params.exposure;
     u.vignetteStrength.value = this.params.vignetteStrength;
-    u.waveAmplitude.value = this.params.waveAmplitude;
-    u.waveFrequency.value = this.params.waveFrequency;
-    u.waveSpeed.value = this.params.waveSpeed;
     this.packWaveUniforms();
     u.cubeDepth.value = this.params.cubeDepth;
     u.sunDir.value.set(sunX, sunY, sunZ);

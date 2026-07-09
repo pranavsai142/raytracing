@@ -19,12 +19,10 @@ uniform vec3 sunDir;
 uniform float sunIntensity;
 uniform float volumeSigma;
 uniform float volumeG;
-uniform float waveAmplitude;
-uniform float waveFrequency;
-uniform float waveSpeed;
 // Packed wave components (single path for all presets). Max 4.
 // waveCompA[i] = (amplitude, frequency, speed/ω, phase)
 // waveCompB[i] = (dirX, dirY, standing 0/1, unused)
+// waveCount is set by CPU for metadata/debug; height loops fixed-4 with amp=0 pads.
 uniform int waveCount;
 uniform vec4 waveCompA[4];
 uniform vec4 waveCompB[4];
