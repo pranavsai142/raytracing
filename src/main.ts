@@ -1,7 +1,7 @@
 import { PathTracer } from './PathTracer';
 import type { ChapterId } from './chapters';
 import { setupCameraControls } from './cameraControls';
-import { setupUI } from './ui';
+import { applyParamsToUI, setupUI } from './ui';
 
 const statsEl = document.getElementById('stats');
 
@@ -60,6 +60,7 @@ try {
       document.querySelectorAll('[data-chapter]').forEach((el) => {
         el.classList.toggle('active', (el as HTMLElement).dataset.chapter === id);
       });
+      applyParamsToUI(tracer);
     },
     setUnderwater: (under) => tracer.setUnderwaterView(under),
     getMode: () => tracer.getRenderMode(),

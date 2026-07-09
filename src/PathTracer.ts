@@ -5,6 +5,97 @@ import fragShader from './shaders/pathTracer.frag.glsl?raw';
 
 export type AbsorptionModel = 'neutral' | 'beer' | 'goethe';
 
+/** Wave surface component — summed in the fragment shader (max 4). */
+export interface WaveComponent {
+  amplitude: number;
+  frequency: number;
+  speed: number;
+  /** Propagation angle in XZ plane, degrees. */
+  directionDeg: number;
+  /** Phase offset in radians. */
+  phase: number;
+  /** Standing: A·sin(k·p+φ)·cos(ωt); traveling: A·sin(k·p−ωt+φ). */
+  standing: boolean;
+}
+
+export type WavePreset = 'multi-octave' | 'single-sine' | 'standing' | 'custom';
+
+export const MAX_WAVE_COMPONENTS = 4;
+
+/**
+ * Rebuild the legacy 4-octave ocean as explicit components.
+ * Matches pathTracer.frag historical ratios: amp*=0.52, freq*=1.85, spd*=1.05,
+ * angles i*1.3+0.7 with dir normalize(cos(ang), sin(ang*0.6)), and per-octave
+ * temporal factor (0.9 + i*0.15) baked into each component's speed.
+ */
+export function buildMultiOctaveComponents(
+  baseAmp: number,
+  baseFreq: number,
+  baseSpd: number,
+): WaveComponent[] {
+  const comps: WaveComponent[] = [];
+  let amp = baseAmp;
+  let freq = baseFreq;
+  let spd = baseSpd;
+  for (let i = 0; i < MAX_WAVE_COMPONENTS; i++) {
+    const fi = i;
+    const ang = fi * 1.3 + 0.7;
+    const rawX = Math.cos(ang);
+    const rawY = Math.sin(ang * 0.6);
+    const len = Math.hypot(rawX, rawY) || 1;
+    const dirX = rawX / len;
+    const dirY = rawY / len;
+    const directionDeg = (Math.atan2(dirY, dirX) * 180) / Math.PI;
+    comps.push({
+      amplitude: amp,
+      frequency: freq,
+      // Bake historical per-octave speed multiplier into ω
+      speed: spd * (0.9 + fi * 0.15),
+      directionDeg,
+      phase: 0,
+      standing: false,
+    });
+    amp *= 0.52;
+    freq *= 1.85;
+    spd *= 1.05;
+  }
+  return comps;
+}
+
+export function buildSingleSineComponent(
+  amp: number,
+  freq: number,
+  spd: number,
+): WaveComponent {
+  return {
+    amplitude: amp,
+    frequency: freq,
+    speed: spd,
+    directionDeg: 0,
+    phase: 0,
+    standing: false,
+  };
+}
+
+export function buildStandingComponent(
+  amp: number,
+  freq: number,
+  spd: number,
+): WaveComponent {
+  return {
+    amplitude: amp,
+    frequency: freq,
+    speed: spd,
+    directionDeg: 0,
+    phase: 0,
+    standing: true,
+  };
+}
+
+export function cloneWaveComponent(c: WaveComponent): WaveComponent {
+  return { ...c };
+}
+
 export interface SimParams {
   waterIOR: number;
   interfaceRoughness: number;
@@ -20,9 +111,15 @@ export interface SimParams {
   temporalBlend: number;
   exposure: number;
   vignetteStrength: number;
+  /** Legacy macro amplitude — rebuilds multi-octave / scales single|standing primary. */
   waveAmplitude: number;
+  /** Legacy macro spatial frequency. */
   waveFrequency: number;
+  /** Legacy macro phase speed. */
   waveSpeed: number;
+  wavePreset: WavePreset;
+  /** Active wave components (1–4). GPU uses waveCount = length. */
+  waveComponents: WaveComponent[];
   timeScale: number;
   animateWaves: boolean;
   cubeDepth: number;
@@ -136,6 +233,8 @@ export class PathTracer {
     waveAmplitude: 0.08,
     waveFrequency: 0.5,
     waveSpeed: 0.6,
+    wavePreset: 'multi-octave',
+    waveComponents: buildMultiOctaveComponents(0.08, 0.5, 0.6),
     timeScale: 0.15,
     // Default LIVE: animated ocean. Uncheck "Animate Scene" (or freezeForCapture) for clean progressive path-trace.
     animateWaves: true,
@@ -426,8 +525,129 @@ export class PathTracer {
       window.location.hash = `chapter=${id}`;
     }
 
+    // Chapter presets often touch waveAmplitude; keep GPU components in sync for non-custom modes.
+    this.syncWaveComponentsFromMacros();
     this.onChapterChanged?.(id, def.badge);
     this.markSceneChanged();
+  }
+
+  /**
+   * Rebuild or scale waveComponents from legacy macro knobs according to wavePreset.
+   * - multi-octave: full 4-octave rebuild (legacy fidelity)
+   * - single-sine / standing: primary component amp/freq/speed from macros (dir/phase kept if present)
+   * - custom: no-op (user owns the list)
+   */
+  syncWaveComponentsFromMacros(): void {
+    const { waveAmplitude: amp, waveFrequency: freq, waveSpeed: spd, wavePreset } = this.params;
+    if (wavePreset === 'custom') return;
+
+    if (wavePreset === 'multi-octave') {
+      this.params.waveComponents = buildMultiOctaveComponents(amp, freq, spd);
+      return;
+    }
+
+    const standing = wavePreset === 'standing';
+    const prev = this.params.waveComponents[0];
+    const base = standing
+      ? buildStandingComponent(amp, freq, spd)
+      : buildSingleSineComponent(amp, freq, spd);
+    if (prev) {
+      base.directionDeg = prev.directionDeg;
+      base.phase = prev.phase;
+    }
+    base.standing = standing;
+    this.params.waveComponents = [base];
+  }
+
+  /** Apply a named preset, overwriting components (except custom, which only flips the label). */
+  setWavePreset(preset: WavePreset): void {
+    this.params.wavePreset = preset;
+    if (preset === 'custom') {
+      // Ensure at least one component exists for the editor
+      if (this.params.waveComponents.length === 0) {
+        this.params.waveComponents = [
+          buildSingleSineComponent(
+            this.params.waveAmplitude,
+            this.params.waveFrequency,
+            this.params.waveSpeed,
+          ),
+        ];
+      }
+      return;
+    }
+    if (preset === 'multi-octave') {
+      this.params.waveComponents = buildMultiOctaveComponents(
+        this.params.waveAmplitude,
+        this.params.waveFrequency,
+        this.params.waveSpeed,
+      );
+      return;
+    }
+    if (preset === 'single-sine') {
+      this.params.waveComponents = [
+        buildSingleSineComponent(
+          this.params.waveAmplitude,
+          this.params.waveFrequency,
+          this.params.waveSpeed,
+        ),
+      ];
+      return;
+    }
+    // standing
+    this.params.waveComponents = [
+      buildStandingComponent(
+        this.params.waveAmplitude,
+        this.params.waveFrequency,
+        this.params.waveSpeed,
+      ),
+    ];
+  }
+
+  /** Mark components dirty → preset becomes custom (user edited a field). */
+  markWaveComponentsCustom(): void {
+    this.params.wavePreset = 'custom';
+  }
+
+  /** Clamp and ensure waveComponents length is in [1, MAX_WAVE_COMPONENTS]. */
+  clampWaveComponents(): void {
+    let comps = this.params.waveComponents;
+    if (comps.length > MAX_WAVE_COMPONENTS) {
+      comps = comps.slice(0, MAX_WAVE_COMPONENTS);
+    }
+    if (comps.length === 0) {
+      comps = [
+        buildSingleSineComponent(
+          this.params.waveAmplitude,
+          this.params.waveFrequency,
+          this.params.waveSpeed,
+        ),
+      ];
+    }
+    this.params.waveComponents = comps;
+  }
+
+  private packWaveUniforms(): void {
+    const u = this.material.uniforms;
+    const comps = this.params.waveComponents;
+    const n = Math.min(MAX_WAVE_COMPONENTS, Math.max(0, comps.length));
+    u.waveCount.value = n;
+    const aArr = u.waveCompA.value as THREE.Vector4[];
+    const bArr = u.waveCompB.value as THREE.Vector4[];
+    for (let i = 0; i < MAX_WAVE_COMPONENTS; i++) {
+      if (i < n) {
+        const c = comps[i];
+        const theta = (c.directionDeg * Math.PI) / 180;
+        const dirX = Math.cos(theta);
+        const dirY = Math.sin(theta);
+        // A: amp, freq, speed(ω), phase
+        aArr[i].set(c.amplitude, c.frequency, c.speed, c.phase);
+        // B: dirX, dirY, standing flag, unused
+        bArr[i].set(dirX, dirY, c.standing ? 1 : 0, 0);
+      } else {
+        aArr[i].set(0, 0, 0, 0);
+        bArr[i].set(1, 0, 0, 0);
+      }
+    }
   }
 
   applyTimeOfDay(t: number): void {
@@ -495,6 +715,23 @@ export class PathTracer {
       waveAmplitude: { value: 0.08 },
       waveFrequency: { value: 0.5 },
       waveSpeed: { value: 0.6 },
+      waveCount: { value: 4 },
+      waveCompA: {
+        value: [
+          new THREE.Vector4(),
+          new THREE.Vector4(),
+          new THREE.Vector4(),
+          new THREE.Vector4(),
+        ],
+      },
+      waveCompB: {
+        value: [
+          new THREE.Vector4(),
+          new THREE.Vector4(),
+          new THREE.Vector4(),
+          new THREE.Vector4(),
+        ],
+      },
       cubeDepth: { value: -2.2 },
       cubeRotY: { value: 0 },
       cubeRotX: { value: 0 },
@@ -635,7 +872,10 @@ export class PathTracer {
     if (!this.params.animateWaves) return false;
     const cubeSpinning =
       Math.abs(this.params.cubeRotSpeedY) > 1e-6 || Math.abs(this.params.cubeRotSpeedX) > 1e-6;
-    const wavesMoving = this.params.waveAmplitude > 1e-5 && this.params.timeScale > 1e-5;
+    const anyWaveAmp = this.params.waveComponents.some((c) => Math.abs(c.amplitude) > 1e-5);
+    const wavesMoving =
+      this.params.timeScale > 1e-5 &&
+      (anyWaveAmp || Math.abs(this.params.waveAmplitude) > 1e-5);
     return cubeSpinning || wavesMoving || this.params.autoOrbit;
   }
 
@@ -711,6 +951,7 @@ export class PathTracer {
     u.waveAmplitude.value = this.params.waveAmplitude;
     u.waveFrequency.value = this.params.waveFrequency;
     u.waveSpeed.value = this.params.waveSpeed;
+    this.packWaveUniforms();
     u.cubeDepth.value = this.params.cubeDepth;
     u.sunDir.value.set(sunX, sunY, sunZ);
     u.sunIntensity.value = this.params.sunIntensity;

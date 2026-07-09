@@ -1,9 +1,19 @@
 import { CHAPTERS, WATER_PRESETS, type ChapterId } from './chapters';
-import { PathTracer, type AbsorptionModel } from './PathTracer';
+import {
+  PathTracer,
+  MAX_WAVE_COMPONENTS,
+  cloneWaveComponent,
+  type AbsorptionModel,
+  type WaveComponent,
+  type WavePreset,
+} from './PathTracer';
 
 type NumKey = {
   [K in keyof PathTracer['params']]: PathTracer['params'][K] extends number ? K : never;
 }[keyof PathTracer['params']];
+
+/** Selected component index for the Wave Advanced editor. */
+let selectedWaveCompIndex = 0;
 
 export function setupUI(tracer: PathTracer): void {
   const bindSlider = (id: string, valId: string, key: NumKey, decimals = 2) => {
@@ -32,9 +42,10 @@ export function setupUI(tracer: PathTracer): void {
   bindSlider('ior', 'ior-val', 'waterIOR');
   bindSlider('roughness', 'roughness-val', 'interfaceRoughness');
   bindSlider('dispersion', 'dispersion-val', 'dispersion', 3);
-  bindSlider('wave-amp', 'wave-amp-val', 'waveAmplitude', 3);
-  bindSlider('wave-freq', 'wave-freq-val', 'waveFrequency');
-  bindSlider('wave-spd', 'wave-spd-val', 'waveSpeed');
+  // Wave macros: custom handlers so multi-octave / single / standing rebuild components
+  bindWaveMacroSlider(tracer, 'wave-amp', 'wave-amp-val', 'waveAmplitude', 3);
+  bindWaveMacroSlider(tracer, 'wave-freq', 'wave-freq-val', 'waveFrequency', 2);
+  bindWaveMacroSlider(tracer, 'wave-spd', 'wave-spd-val', 'waveSpeed', 2);
   bindSlider('time-scale', 'time-scale-val', 'timeScale');
   bindSlider('sun-elev', 'sun-elev-val', 'sunElevation');
   bindSlider('sun-az', 'sun-az-val', 'sunAzimuth');
@@ -65,6 +76,8 @@ export function setupUI(tracer: PathTracer): void {
   bindSlider('moon-int', 'moon-int-val', 'moonIntensity');
   bindSlider('candle-int', 'candle-int-val', 'candleIntensity');
   bindSlider('afterimage-decay', 'afterimage-decay-val', 'afterimageDecay', 3);
+
+  setupWaveAdvancedUI(tracer);
 
   const bindVec3 = (
     ids: [string, string, string],
@@ -146,7 +159,7 @@ export function setupUI(tracer: PathTracer): void {
     document.querySelectorAll('[data-chapter]').forEach((el) => {
       el.classList.toggle('active', (el as HTMLElement).dataset.chapter === id);
     });
-    syncSlidersFromTracer(tracer);
+    applyParamsToUI(tracer);
   };
 
   tracer.onChapterChanged = (id, badgeType) => {
@@ -185,9 +198,219 @@ export function setupUI(tracer: PathTracer): void {
   setInterval(refreshStats, 400);
 
   tracer.onChapterChanged(tracer.params.activeChapter, tracer.getChapterBadge());
+  applyParamsToUI(tracer);
 }
 
-function syncSlidersFromTracer(tracer: PathTracer): void {
+function bindWaveMacroSlider(
+  tracer: PathTracer,
+  id: string,
+  valId: string,
+  key: 'waveAmplitude' | 'waveFrequency' | 'waveSpeed',
+  decimals: number,
+): void {
+  const slider = document.getElementById(id) as HTMLInputElement | null;
+  const valEl = document.getElementById(valId);
+  if (!slider || !valEl) return;
+  const fmt = (v: number) => v.toFixed(decimals);
+  slider.addEventListener('input', () => {
+    const v = parseFloat(slider.value);
+    tracer.params[key] = v;
+    valEl.textContent = fmt(v);
+    tracer.syncWaveComponentsFromMacros();
+    syncWaveAdvancedUI(tracer);
+    tracer.markSceneChanged();
+  });
+  valEl.textContent = fmt(parseFloat(slider.value));
+}
+
+function setupWaveAdvancedUI(tracer: PathTracer): void {
+  const presetEl = document.getElementById('wave-preset') as HTMLSelectElement | null;
+  const indexEl = document.getElementById('wave-comp-index') as HTMLSelectElement | null;
+  const ampEl = document.getElementById('wave-comp-amp') as HTMLInputElement | null;
+  const freqEl = document.getElementById('wave-comp-freq') as HTMLInputElement | null;
+  const spdEl = document.getElementById('wave-comp-spd') as HTMLInputElement | null;
+  const dirEl = document.getElementById('wave-comp-dir') as HTMLInputElement | null;
+  const phaseEl = document.getElementById('wave-comp-phase') as HTMLInputElement | null;
+  const standingEl = document.getElementById('wave-comp-standing') as HTMLInputElement | null;
+  const addBtn = document.getElementById('wave-comp-add') as HTMLButtonElement | null;
+  const removeBtn = document.getElementById('wave-comp-remove') as HTMLButtonElement | null;
+
+  if (!presetEl || !indexEl || !ampEl || !freqEl || !spdEl || !dirEl || !phaseEl || !standingEl) {
+    return;
+  }
+
+  const readSelected = (): WaveComponent | null => {
+    const comps = tracer.params.waveComponents;
+    if (comps.length === 0) return null;
+    selectedWaveCompIndex = Math.max(0, Math.min(selectedWaveCompIndex, comps.length - 1));
+    return comps[selectedWaveCompIndex];
+  };
+
+  const writeField = (mutator: (c: WaveComponent) => void) => {
+    const c = readSelected();
+    if (!c) return;
+    mutator(c);
+    tracer.markWaveComponentsCustom();
+    syncWaveAdvancedUI(tracer);
+    tracer.markSceneChanged();
+  };
+
+  const setVal = (valId: string, text: string) => {
+    const el = document.getElementById(valId);
+    if (el) el.textContent = text;
+  };
+
+  presetEl.addEventListener('change', () => {
+    tracer.setWavePreset(presetEl.value as WavePreset);
+    selectedWaveCompIndex = 0;
+    syncWaveAdvancedUI(tracer);
+    tracer.markSceneChanged();
+  });
+
+  indexEl.addEventListener('change', () => {
+    selectedWaveCompIndex = parseInt(indexEl.value, 10) || 0;
+    syncWaveAdvancedUI(tracer);
+  });
+
+  ampEl.addEventListener('input', () => {
+    const v = parseFloat(ampEl.value);
+    setVal('wave-comp-amp-val', v.toFixed(3));
+    writeField((c) => {
+      c.amplitude = v;
+    });
+  });
+  freqEl.addEventListener('input', () => {
+    const v = parseFloat(freqEl.value);
+    setVal('wave-comp-freq-val', v.toFixed(2));
+    writeField((c) => {
+      c.frequency = v;
+    });
+  });
+  spdEl.addEventListener('input', () => {
+    const v = parseFloat(spdEl.value);
+    setVal('wave-comp-spd-val', v.toFixed(2));
+    writeField((c) => {
+      c.speed = v;
+    });
+  });
+  dirEl.addEventListener('input', () => {
+    const v = parseFloat(dirEl.value);
+    setVal('wave-comp-dir-val', String(Math.round(v)));
+    writeField((c) => {
+      c.directionDeg = v;
+    });
+  });
+  phaseEl.addEventListener('input', () => {
+    const v = parseFloat(phaseEl.value);
+    setVal('wave-comp-phase-val', v.toFixed(2));
+    writeField((c) => {
+      c.phase = v;
+    });
+  });
+  standingEl.addEventListener('change', () => {
+    writeField((c) => {
+      c.standing = standingEl.checked;
+    });
+  });
+
+  addBtn?.addEventListener('click', () => {
+    tracer.clampWaveComponents();
+    const comps = tracer.params.waveComponents;
+    if (comps.length >= MAX_WAVE_COMPONENTS) return;
+    const last = comps[comps.length - 1];
+    const next = cloneWaveComponent(last);
+    // Slightly vary so new component is visible
+    next.directionDeg = (next.directionDeg + 47) % 360;
+    next.amplitude *= 0.6;
+    next.frequency *= 1.4;
+    comps.push(next);
+    tracer.markWaveComponentsCustom();
+    selectedWaveCompIndex = comps.length - 1;
+    syncWaveAdvancedUI(tracer);
+    tracer.markSceneChanged();
+  });
+
+  removeBtn?.addEventListener('click', () => {
+    tracer.clampWaveComponents();
+    const comps = tracer.params.waveComponents;
+    if (comps.length <= 1) return;
+    comps.splice(selectedWaveCompIndex, 1);
+    selectedWaveCompIndex = Math.min(selectedWaveCompIndex, comps.length - 1);
+    tracer.markWaveComponentsCustom();
+    syncWaveAdvancedUI(tracer);
+    tracer.markSceneChanged();
+  });
+
+  syncWaveAdvancedUI(tracer);
+}
+
+/** Refresh Wave Advanced controls from tracer.params. */
+function syncWaveAdvancedUI(tracer: PathTracer): void {
+  const presetEl = document.getElementById('wave-preset') as HTMLSelectElement | null;
+  const indexEl = document.getElementById('wave-comp-index') as HTMLSelectElement | null;
+  const ampEl = document.getElementById('wave-comp-amp') as HTMLInputElement | null;
+  const freqEl = document.getElementById('wave-comp-freq') as HTMLInputElement | null;
+  const spdEl = document.getElementById('wave-comp-spd') as HTMLInputElement | null;
+  const dirEl = document.getElementById('wave-comp-dir') as HTMLInputElement | null;
+  const phaseEl = document.getElementById('wave-comp-phase') as HTMLInputElement | null;
+  const standingEl = document.getElementById('wave-comp-standing') as HTMLInputElement | null;
+  const addBtn = document.getElementById('wave-comp-add') as HTMLButtonElement | null;
+  const removeBtn = document.getElementById('wave-comp-remove') as HTMLButtonElement | null;
+
+  if (!presetEl || !indexEl || !ampEl || !freqEl || !spdEl || !dirEl || !phaseEl || !standingEl) {
+    return;
+  }
+
+  tracer.clampWaveComponents();
+  const comps = tracer.params.waveComponents;
+  selectedWaveCompIndex = Math.max(0, Math.min(selectedWaveCompIndex, comps.length - 1));
+
+  presetEl.value = tracer.params.wavePreset;
+
+  // Rebuild index options
+  const prevFocus = document.activeElement;
+  indexEl.innerHTML = '';
+  for (let i = 0; i < comps.length; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    const tag = comps[i].standing ? 'stand' : 'travel';
+    opt.textContent = `${i} (${tag})`;
+    indexEl.appendChild(opt);
+  }
+  indexEl.value = String(selectedWaveCompIndex);
+
+  const c = comps[selectedWaveCompIndex];
+  ampEl.value = String(c.amplitude);
+  freqEl.value = String(c.frequency);
+  spdEl.value = String(c.speed);
+  // Normalize direction display to [0, 360)
+  let dir = c.directionDeg % 360;
+  if (dir < 0) dir += 360;
+  dirEl.value = String(dir);
+  phaseEl.value = String(c.phase);
+  standingEl.checked = c.standing;
+
+  const setText = (id: string, t: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = t;
+  };
+  setText('wave-comp-amp-val', c.amplitude.toFixed(3));
+  setText('wave-comp-freq-val', c.frequency.toFixed(2));
+  setText('wave-comp-spd-val', c.speed.toFixed(2));
+  setText('wave-comp-dir-val', String(Math.round(dir)));
+  setText('wave-comp-phase-val', c.phase.toFixed(2));
+
+  if (addBtn) addBtn.disabled = comps.length >= MAX_WAVE_COMPONENTS;
+  if (removeBtn) removeBtn.disabled = comps.length <= 1;
+
+  // Avoid stealing focus while typing/dragging
+  if (prevFocus instanceof HTMLElement && document.contains(prevFocus)) {
+    // no-op; select rebuild may have blurred — acceptable on sync
+  }
+}
+
+/** Full UI resync from tracer.params (chapter load / external API). */
+export function applyParamsToUI(tracer: PathTracer): void {
   const set = (id: string, val: number, valId?: string, decimals?: number) => {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
@@ -286,6 +509,8 @@ function syncSlidersFromTracer(tracer: PathTracer): void {
   const btnBelow = document.getElementById('view-below');
   btnAbove?.classList.toggle('active', !p.underwaterView);
   btnBelow?.classList.toggle('active', p.underwaterView);
+
+  syncWaveAdvancedUI(tracer);
 }
 
 function exportImage(tracer: PathTracer): void {

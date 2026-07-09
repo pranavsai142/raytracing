@@ -109,13 +109,13 @@
           <details class="panel-section" open>
             <summary>Wave Topology</summary>
             <div class="section-body">
-              <label class="tip" data-tip="Base height for 4 octaves of directional sines (not a single pure sine). Fixed internal direction/octave ratios; this scales overall amplitude. Tilts normals and changes TIR escape angles.">
+              <label class="tip" data-tip="Legacy macro amplitude. On Ocean multi-octave: rebuilds 4 directional octaves (amp×0.52 each). On Single/Standing: sets primary component amplitude. Custom: does not rewrite your component list — edit components below. Tilts normals and changes TIR escape angles.">
                 Wave Amplitude <input type="range" id="wave-amp" min="0" max="0.25" step="0.005" value="0.08" /><span id="wave-amp-val">0.08</span>
               </label>
-              <label class="tip" data-tip="Base spatial frequency for the 4-octave directional sine sum. Higher = finer ripples; octaves keep fixed ratios above this base.">
+              <label class="tip" data-tip="Legacy macro spatial frequency. Multi-octave rebuilds octave k-scales (freq×1.85). Single/Standing: primary k. Custom: leave components as-is.">
                 Wave Frequency <input type="range" id="wave-freq" min="0.2" max="1.5" step="0.05" value="0.5" /><span id="wave-freq-val">0.5</span>
               </label>
-              <label class="tip" data-tip="Base phase speed for the 4-octave directional sines (before Time Scale). Higher = faster scrolling crests.">
+              <label class="tip" data-tip="Legacy macro phase speed (ω scale, before Time Scale). Multi-octave bakes per-octave speed factors. Single/Standing: primary ω. Custom: components unchanged.">
                 Wave Speed <input type="range" id="wave-spd" min="0.1" max="2" step="0.05" value="0.6" /><span id="wave-spd-val">0.6</span>
               </label>
               <label class="tip" data-tip="Multiplier on wave + cube motion when LIVE. Does not advance sim time when Animate is off (STILL freeze).">
@@ -124,6 +124,47 @@
               <label class="tip" data-tip="ON = LIVE path-trace (realtime, noisy, no history blend). OFF = STILL: freeze waves+cube and progressive-accumulate so Snell/TIR/caustics converge. Use STILL for clean stills of trapped ocean light.">
                 <input type="checkbox" id="animate-waves" checked /> Animate Scene (LIVE)
               </label>
+
+              <details class="nested-section">
+                <summary class="tip" data-tip="Edit the sum of up to 4 sine components that define surface height h(p,t). Normals use analytic derivatives of the same sum — honest Snell/TIR topology, not painted foam.">Wave Advanced</summary>
+                <div class="nested-body">
+                  <label class="tip" data-tip="Ocean multi-octave: 4 traveling sines with legacy octave ratios (default look). Single sine: one traveling wave. Standing: A·sin(k·p+φ)·cos(ωt) — nodes/antinodes, no net propagation. Custom: free edit of the component list (editing any field switches here).">
+                    Wave Preset
+                    <select id="wave-preset">
+                      <option value="multi-octave">Ocean multi-octave</option>
+                      <option value="single-sine">Single sine</option>
+                      <option value="standing">Standing wave</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                  </label>
+                  <label class="tip" data-tip="Which component (0..N−1) the sliders below edit. Sum h = Σ components; each may be traveling or standing.">
+                    Component
+                    <select id="wave-comp-index"></select>
+                  </label>
+                  <label class="tip" data-tip="Component amplitude A. Height contribution A·sin(…). Zero flattens this mode.">
+                    Comp Amp <input type="range" id="wave-comp-amp" min="0" max="0.25" step="0.005" value="0.08" /><span id="wave-comp-amp-val">0.08</span>
+                  </label>
+                  <label class="tip" data-tip="Spatial frequency scale: wave vector k = f · (cos θ, sin θ). Higher f = shorter wavelength, sharper normal tilts.">
+                    Comp Freq <input type="range" id="wave-comp-freq" min="0.05" max="3" step="0.05" value="0.5" /><span id="wave-comp-freq-val">0.5</span>
+                  </label>
+                  <label class="tip" data-tip="Temporal frequency ω (phase speed scale). Traveling: phase advances as −ωt. Standing: envelope cos(ωt). Multiplied by Time Scale in LIVE.">
+                    Comp Speed <input type="range" id="wave-comp-spd" min="0" max="3" step="0.05" value="0.6" /><span id="wave-comp-spd-val">0.6</span>
+                  </label>
+                  <label class="tip" data-tip="Propagation direction in the XZ plane (degrees). k points along this angle; crests travel that way for traveling modes.">
+                    Direction ° <input type="range" id="wave-comp-dir" min="0" max="360" step="1" value="0" /><span id="wave-comp-dir-val">0</span>
+                  </label>
+                  <label class="tip" data-tip="Phase offset φ in radians (0–2π). Shifts crest positions without changing wavelength or speed.">
+                    Phase <input type="range" id="wave-comp-phase" min="0" max="6.2832" step="0.01" value="0" /><span id="wave-comp-phase-val">0.00</span>
+                  </label>
+                  <label class="tip" data-tip="Standing: A·sin(k·p+φ)·cos(ωt) — fixed nodes, oscillates in place. Unchecked = traveling A·sin(k·p−ωt+φ).">
+                    <input type="checkbox" id="wave-comp-standing" /> Standing mode
+                  </label>
+                  <div class="wave-comp-actions">
+                    <button type="button" id="wave-comp-add" class="tip" data-tip="Add a component (max 4). Switches preset to Custom.">Add</button>
+                    <button type="button" id="wave-comp-remove" class="tip" data-tip="Remove selected component (min 1). Switches preset to Custom.">Remove</button>
+                  </div>
+                </div>
+              </details>
             </div>
           </details>
 

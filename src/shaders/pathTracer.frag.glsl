@@ -22,6 +22,12 @@ uniform float volumeG;
 uniform float waveAmplitude;
 uniform float waveFrequency;
 uniform float waveSpeed;
+// Packed wave components (single path for all presets). Max 4.
+// waveCompA[i] = (amplitude, frequency, speed/ω, phase)
+// waveCompB[i] = (dirX, dirY, standing 0/1, unused)
+uniform int waveCount;
+uniform vec4 waveCompA[4];
+uniform vec4 waveCompB[4];
 uniform float cubeDepth;
 uniform float cubeRotY;
 uniform float cubeRotX;
@@ -70,20 +76,26 @@ vec2 rand2(vec2 seed) {
 }
 
 // --- Waves: surface TOPOLOGY drives escape angles ---
+// Sum of up to 4 components (CPU packs multi-octave / single / standing / custom).
+// Traveling: A * sin(k·p − ω t + φ)
+// Standing:  A * sin(k·p + φ) * cos(ω t)
+// k = frequency * (dirX, dirY), ω = speed
 float waveHeight(vec2 p, float t) {
   float h = 0.0;
-  float amp = waveAmplitude;
-  float freq = waveFrequency;
-  float spd = waveSpeed;
+  // Fixed 4-iter loop (unused slots packed with amp=0). waveCount kept for CPU/debug.
   for (int i = 0; i < 4; i++) {
-    float fi = float(i);
-    float ang = fi * 1.3 + 0.7;
-    vec2 dir = normalize(vec2(cos(ang), sin(ang * 0.6)));
-    float ph = dot(dir, p) * freq - t * spd * (0.9 + fi * 0.15);
-    h += amp * sin(ph);
-    amp *= 0.52;
-    freq *= 1.85;
-    spd *= 1.05;
+    float amp = waveCompA[i].x;
+    float freq = waveCompA[i].y;
+    float spd = waveCompA[i].z;
+    float phase = waveCompA[i].w;
+    vec2 dir = waveCompB[i].xy;
+    float standing = waveCompB[i].z;
+    float kdot = dot(dir, p) * freq;
+    if (standing > 0.5) {
+      h += amp * sin(kdot + phase) * cos(spd * t);
+    } else {
+      h += amp * sin(kdot - spd * t + phase);
+    }
   }
   return h;
 }
@@ -91,21 +103,28 @@ float waveHeight(vec2 p, float t) {
 vec2 waveDeriv(vec2 p, float t) {
   float dhdx = 0.0;
   float dhdz = 0.0;
-  float amp = waveAmplitude;
-  float freq = waveFrequency;
-  float spd = waveSpeed;
   for (int i = 0; i < 4; i++) {
-    float fi = float(i);
-    float ang = fi * 1.3 + 0.7;
-    vec2 dir = normalize(vec2(cos(ang), sin(ang * 0.6)));
-    float ph = dot(dir, p) * freq - t * spd * (0.9 + fi * 0.15);
-    float c = cos(ph);
-    float k = freq;
-    dhdx += amp * k * dir.x * c;
-    dhdz += amp * k * dir.y * c;
-    amp *= 0.52;
-    freq *= 1.85;
-    spd *= 1.05;
+    float amp = waveCompA[i].x;
+    float freq = waveCompA[i].y;
+    float spd = waveCompA[i].z;
+    float phase = waveCompA[i].w;
+    vec2 dir = waveCompB[i].xy;
+    float standing = waveCompB[i].z;
+    float kdot = dot(dir, p) * freq;
+    // k = frequency * dir
+    float kx = freq * dir.x;
+    float kz = freq * dir.y;
+    if (standing > 0.5) {
+      // ∂/∂x [A sin(k·p+φ) cos(ωt)] = A cos(k·p+φ) * kx * cos(ωt)
+      float c = cos(kdot + phase) * cos(spd * t);
+      dhdx += amp * kx * c;
+      dhdz += amp * kz * c;
+    } else {
+      // ∂/∂x [A sin(k·p − ωt + φ)] = A cos(k·p − ωt + φ) * kx
+      float c = cos(kdot - spd * t + phase);
+      dhdx += amp * kx * c;
+      dhdz += amp * kz * c;
+    }
   }
   return vec2(dhdx, dhdz);
 }
