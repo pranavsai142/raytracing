@@ -459,23 +459,67 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
       break;
     }
 
-    // Cube proxy — lit ONLY by paths that actually transmitted through interface
+    // Cube — north-star validation geometry. Light comes through the dielectric:
+    // reverse-NEE samples the waved surface, Snell-refracts toward the sun (caustics),
+    // and TIR paths contribute zero transmission (trapped light never arrives).
     if (hit.material == 1) {
       vec3 cubeCenter = vec3(0.0, cubeDepth, 0.0);
       vec3 localP = rotateCubeInv(hit.point - cubeCenter);
-      vec3 localN = rotateCubeInv(N);
+      vec3 localN = normalize(rotateCubeInv(N));
+      vec3 worldN = normalize(N);
       if (inWater) {
         vec3 att = volumeAttenuation(hit.dist, lambdaNm);
-        vec3 godBeam = scatterTint * spectrumWeight(lambdaNm);
-        accum += throughput * godBeam * (vec3(1.0) - att) * 0.1;
+        vec3 godBeam = scatterTint * spectrumWeight(lambdaNm) * volumeTint;
+        accum += throughput * godBeam * (vec3(1.0) - att) * 0.08;
         throughput *= att;
       }
       vec3 albedo = cubeTexture(localP, localN);
       vec3 sunL = normalize(sunDir);
       vec3 fillL = normalize(fillDir);
-      float sunVis = shadowedByRod(hit.point, sunL) ? 0.0 : max(dot(localN, sunL), 0.0);
-      float fillVis = shadowedByRod(hit.point, fillL) ? 0.0 : max(dot(localN, fillL), 0.0);
-      vec3 lit = albedo * (sunVis * sunIntensity * vec3(1.1, 1.0, 0.85) + fillVis * fillIntensity * fillTint);
+
+      // Interface caustic gather: sample surface points above the cube hit
+      vec3 caustic = vec3(0.0);
+      for (int ci = 0; ci < 4; ci++) {
+        vec2 rj = rand2(seed + float(bounce * 31 + ci * 7) + float(ci) * 0.17);
+        // Jitter on surface around vertical projection of hit toward sun slant
+        vec2 surfXZ = hit.point.xz + (rj - 0.5) * 2.4 + sunL.xz * 0.8;
+        float h = waveHeight(surfXZ, time);
+        vec3 surfP = vec3(surfXZ.x, h, surfXZ.y);
+        vec3 toSurf = surfP - hit.point;
+        float distS = length(toSurf);
+        if (distS < 0.001) continue;
+        vec3 L = toSurf / distS;
+        float nDotL = max(dot(worldN, L), 0.0);
+        if (nDotL < 0.001) continue;
+
+        vec3 sN = waveNormal(surfXZ, time);
+        // Water -> air refraction of path from cube to surface continuing to sun
+        vec3 N_eff = sN;
+        float eta = ior; // water IOR / air
+        if (dot(-L, N_eff) < 0.0) N_eff = -N_eff;
+        float cosI = max(dot(N_eff, -L), 0.0);
+        float sinT2 = eta * eta * (1.0 - cosI * cosI);
+        // TIR: no transmission out — light stays trapped; no contribution
+        if (sinT2 > 1.0) continue;
+        float cosT = sqrt(max(0.0, 1.0 - sinT2));
+        vec3 Tdir = normalize(eta * (-L) + (eta * cosI - cosT) * N_eff);
+        float sunAlign = max(dot(Tdir, sunL), 0.0);
+        // Sharp focus = caustic hotspots from wave topology + spectral IOR
+        float focus = pow(sunAlign, 48.0 + dispersion * 400.0);
+        float fresT = 1.0 - schlickFresnel(cosI, eta);
+        vec3 attPath = volumeAttenuation(distS, lambdaNm);
+        caustic += attPath * fresT * focus * nDotL * sunIntensity * vec3(1.15, 1.05, 0.9);
+      }
+      caustic *= spectrumWeight(lambdaNm) * 0.25;
+
+      // Soft fill through Snell cone (ambient ocean light, not painted pigment)
+      float snellAmbient = 0.12 + 0.18 * max(sunL.y, 0.0);
+      vec3 fillTerm = fillIntensity * fillTint * max(dot(worldN, fillL), 0.0) * 0.35;
+      vec3 ambient = snellAmbient * mix(vec3(0.35, 0.5, 0.65), scatterTint, 0.35);
+      // Mild direct only when camera/path is above water (air-side view of cube through interface)
+      float airDirect = inWater ? 0.0 : max(dot(worldN, sunL), 0.0) * sunIntensity * 0.25;
+
+      vec3 lit = albedo * (caustic + ambient + fillTerm + airDirect * vec3(1.1, 1.0, 0.85));
       accum += throughput * lit * spectrumWeight(lambdaNm);
       break;
     }
@@ -657,15 +701,19 @@ void main() {
   }
   color /= max(float(spp), 1.0);
 
-  // While camera moves: show ONLY the current frame (no history = no ghost trails).
-  // When still: gentle blend to reduce noise (real photos don't leave tracers).
+  // LIVE (cameraInteracting / reset): current path-trace frame only — no history.
+  // Blending mismatched wave/cube poses was the spotty ghosting bug.
+  // STILL: progressive Monte Carlo average 1/N so caustics, Snell, TIR converge cleanly.
   vec3 accumulated;
   if (cameraInteracting > 0.5 || resetAccum > 0.5) {
     accumulated = color;
   } else {
     vec3 prev = texture2D(accumTexture, uv).rgb;
-    float alpha = clamp(temporalBlend, 0.02, 0.2);
-    accumulated = mix(prev, color, alpha);
+    float n = max(accumSampleCount, 0.0);
+    float spp = max(samplesPerFrame, 1.0);
+    // Progressive MC: after n prior samples, fold in spp new ones with weight spp/(n+spp).
+    float w = spp / (n + spp);
+    accumulated = mix(prev, color, clamp(w, 0.0, 1.0));
   }
 
   gl_FragColor = vec4(accumulated, 1.0);

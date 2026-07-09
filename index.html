@@ -44,17 +44,17 @@
           </section>
           <section class="panel-section">
             <h2>Render Quality</h2>
-            <label class="tip" data-tip="Path-traced samples added each frame. 1 = smoothest motion, higher = faster convergence but more noise per frame.">
+            <label class="tip" data-tip="Path-traced samples per LIVE frame, or added per still-frame. Higher = less noise, more GPU.">
               Samples / Frame <input type="range" id="samples-per-frame" min="1" max="4" step="1" value="1" /><span id="samples-per-frame-val">1</span>
             </label>
-            <label class="tip" data-tip="Noise reduction when camera is STILL only. While moving, each frame is fresh (no ghost trails). Lower = slower but smoother convergence.">
+            <label class="tip" data-tip="Only used for early STILL frames. STILL mode uses true progressive 1/N averaging for caustics/TIR. LIVE never blends history.">
               Temporal Smoothing <input type="range" id="temporal-blend" min="0.02" max="0.2" step="0.01" value="0.05" /><span id="temporal-blend-val">0.05</span>
             </label>
             <label class="tip" data-tip="Internal path-trace resolution scale. Lower = faster GPU, slightly softer image.">
-              Render Scale <input type="range" id="render-scale" min="0.35" max="1" step="0.05" value="0.65" /><span id="render-scale-val">0.65</span>
+              Render Scale <input type="range" id="render-scale" min="0.35" max="1" step="0.05" value="0.75" /><span id="render-scale-val">0.75</span>
             </label>
-            <label class="tip" data-tip="How many path-trace samples are added per second. Lower = smoother, less flicker. Display still runs at full FPS.">
-              Sample Rate (FPS) <input type="range" id="sample-fps" min="4" max="40" step="1" value="20" /><span id="sample-fps-val">20</span>
+            <label class="tip" data-tip="STILL mode: how often new samples are added. LIVE path-traces every display frame. Display always full FPS.">
+              Sample Rate (FPS) <input type="range" id="sample-fps" min="4" max="60" step="1" value="30" /><span id="sample-fps-val">30</span>
             </label>
             <label class="tip" data-tip="Max light bounces per ray. Lower = faster. TIR trapping needs ≥4 bounces.">
               Max Bounces <input type="range" id="max-bounces" min="3" max="10" step="1" value="6" /><span id="max-bounces-val">6</span>
@@ -91,11 +91,11 @@
             <label class="tip" data-tip="How fast wave phases scroll (before time-scale multiplier).">
               Wave Speed <input type="range" id="wave-spd" min="0.1" max="2" step="0.05" value="0.6" /><span id="wave-spd-val">0.6</span>
             </label>
-            <label class="tip" data-tip="Global animation speed. Lower = smoother path-trace convergence while waves move.">
+            <label class="tip" data-tip="Wave/cube speed when LIVE. Does not apply when Animate is off (STILL freeze).">
               Time Scale <input type="range" id="time-scale" min="0" max="1" step="0.01" value="0.15" /><span id="time-scale-val">0.15</span>
             </label>
-            <label class="tip" data-tip="Toggle wave & cube animation. Off = static scene for fastest convergence.">
-              <input type="checkbox" id="animate-waves" checked /> Animate Scene
+            <label class="tip" data-tip="ON = LIVE path-trace (realtime, noisy, no ghost blend). OFF = freeze waves+cube and progressive-accumulate so Snell/TIR/caustics clean up. This is how you get a clean still of trapped ocean light.">
+              <input type="checkbox" id="animate-waves" checked /> Animate Scene (LIVE)
             </label>
           </section>
 
@@ -194,7 +194,8 @@
 
         <div class="info">
           <p><strong>Move:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>Q</kbd>/<kbd>E</kbd> up/down · drag mouse to look</p>
-          <p><strong>Views:</strong> <kbd>1</kbd> above · <kbd>2</kbd> below · <kbd>O</kbd> orbit · <kbd>R</kbd> reset · <kbd>X</kbd> export</p>
+          <p><strong>Path-trace:</strong> LIVE = Animate on · STILL = uncheck Animate (freeze waves+cube, accumulate caustics/TIR) · <kbd>R</kbd> reset · <kbd>X</kbd> export</p>
+          <p><strong>North star:</strong> Below water = Snell window + trapped light until escape angle · dispersion = chromatic caustics</p>
           <p><strong>Chapters:</strong> <kbd>1</kbd>–<kbd>8</kbd> Goethe I–VIII · hash <code>#chapter=refraction</code></p>
           <p id="stats">Initializing...</p>
         </div>

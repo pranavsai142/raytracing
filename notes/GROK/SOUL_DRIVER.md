@@ -10,14 +10,17 @@ This is a **simulation project**, not an artistic ocean renderer. Phenomena (Sne
 
 ## Current North Star
 
-Deliver a deployed, interactive Three.js path tracer that demonstrates physically correct light transport at the water interface with the rotating cube as validation geometry. See the latest handoff for immediate slice and deployment status.
+Deliver a **deployed**, interactive Three.js path tracer that demonstrates physically correct light transport at the water interface with the rotating cube as validation geometry.
+
+**Immediate gate (2026-07-09):** production ship of the LIVE/STILL visual contract + Snell/TIR hero proof. See `notes/GROK/handoffs/2026-07-09-northstar-visual-deploy-handoff.md` and the production design alongside it.
 
 ## Operating Philosophy
 
 - Physics correctness is the primary test: does light trap underwater and only escape at the right angles?
-- The cube is sacred — preserve rotation, texturing, and submerged placement (y=-3).
+- The cube is sacred — preserve rotation, texturing, and submerged placement (default ~y=-2.2; always below the water plane).
+- LIVE path-trace never blends mismatched geometry; STILL freezes waves+cube then accumulates.
 - Prefer literal path tracing over raster approximations when they conflict.
-- Web deployment must work: build, verify, deploy to GitHub Pages.
+- Web deployment must work: build, smoke, deploy to GitHub Pages (`/raytracing/`).
 - Narrative handoffs capture physics decisions and validation.
 
 ## How This Document Is Used

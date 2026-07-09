@@ -111,6 +111,8 @@ export class PathTracer {
   private cubeRotY = 0;
   private cubeRotX = 0;
   private fixationHold = 0;
+  /** LIVE = scene animating (no history blend). STILL = frozen geometry, progressive accumulate. */
+  private renderMode: 'live' | 'still' = 'live';
 
   preRender: ((dt: number) => void) | null = null;
   onCameraMoved: (() => void) | null = null;
@@ -127,7 +129,7 @@ export class PathTracer {
     volumeSigma: 0.05,
     volumeG: 0.55,
     samplesPerFrame: 1,
-    maxAccumSamples: 128,
+    maxAccumSamples: 256,
     temporalBlend: 0.05,
     exposure: 1.35,
     vignetteStrength: 0.25,
@@ -135,6 +137,7 @@ export class PathTracer {
     waveFrequency: 0.5,
     waveSpeed: 0.6,
     timeScale: 0.15,
+    // Default LIVE: animated ocean. Uncheck "Animate Scene" (or freezeForCapture) for clean progressive path-trace.
     animateWaves: true,
     cubeDepth: -2.2,
     cubeRotSpeedY: 0.004,
@@ -144,8 +147,8 @@ export class PathTracer {
     moveAccel: 3.5,
     moveDamping: 6.0,
     mouseSensitivity: 0.0018,
-    renderScale: 0.65,
-    sampleFps: 20,
+    renderScale: 0.75,
+    sampleFps: 30,
     underwaterView: true,
     autoOrbit: false,
     turbidity: 0.05,
@@ -177,8 +180,9 @@ export class PathTracer {
     afterimageDecay: 0.02,
   };
 
-  cameraPos = new THREE.Vector3(0, -1.2, 3.5);
-  cameraTarget = new THREE.Vector3(0, -1.8, 0);
+  // Default underwater frame: look AT the submerged cube (origin), not away along +Z.
+  cameraPos = new THREE.Vector3(0, -1.0, 4.0);
+  cameraTarget = new THREE.Vector3(0, -2.2, 0);
   cameraUp = new THREE.Vector3(0, 1, 0);
   orbitPhase = 0;
 
@@ -256,8 +260,8 @@ export class PathTracer {
     switch (id) {
       case 'ocean':
         this.params.underwaterView = true;
-        this.cameraPos.set(0, -1.2, 3.5);
-        this.updateCameraTargetFromAngles(0, -0.15);
+        // Frame the sacred cube: Snell window above, cube filling view, TIR around edges
+        this.lookAtCubeUnderwater();
         break;
 
       case 'primordial':
@@ -299,8 +303,9 @@ export class PathTracer {
         this.params.volumeSigma = 0.08;
         this.params.complementStrength = 0.25;
         this.params.underwaterView = true;
-        this.cameraPos.set(0.5, -1.0, 3);
-        this.updateCameraTargetFromAngles(0, -0.2);
+        this.lookAtCubeUnderwater();
+        this.cameraPos.x = 0.6;
+        this.cameraTarget.set(0, this.params.cubeDepth, 0);
         break;
 
       case 'contrast':
@@ -318,8 +323,9 @@ export class PathTracer {
         this.params.maxBounces = 8;
         this.params.waveAmplitude = 0.06;
         this.params.underwaterView = true;
-        this.cameraPos.set(0, -0.3, 2.5);
-        this.updateCameraTargetFromAngles(0, -0.4);
+        // Closer + slightly up: cube + wave surface caustics in one frame
+        this.cameraPos.set(0, -0.55, 3.2);
+        this.cameraTarget.set(0, this.params.cubeDepth + 0.3, 0);
         break;
 
       case 'double-reflect':
@@ -362,8 +368,7 @@ export class PathTracer {
         this.params.cubeDepth = -2.2;
         this.params.exposure = 1.2;
         this.params.underwaterView = false;
-        this.cameraPos.set(0, 2.5, 5);
-        this.updateCameraTargetFromAngles(0, -0.3);
+        this.lookAtCubeAbove();
         break;
 
       case 'diver-view':
@@ -374,8 +379,7 @@ export class PathTracer {
         this.params.volumeSigma = 0.08;
         this.params.fillIntensity = 0.4;
         this.params.complementStrength = 0.35;
-        this.cameraPos.set(0, -1.2, 3);
-        this.updateCameraTargetFromAngles(0, -0.12);
+        this.lookAtCubeUnderwater();
         break;
 
       case 'vessel-elevation':
@@ -384,8 +388,9 @@ export class PathTracer {
         this.params.scatterTint = [1, 1, 1];
         this.params.cubeDepth = -1.5;
         this.params.underwaterView = false;
-        this.cameraPos.set(0, 3, 2.5);
-        this.updateCameraTargetFromAngles(0, -0.7);
+        this.lookAtCubeAbove();
+        this.cameraPos.set(0, 3.2, 2.8);
+        this.cameraTarget.set(0, this.params.cubeDepth, 0);
         break;
 
       case 'wave-contrast':
@@ -579,16 +584,25 @@ export class PathTracer {
     this.cameraTarget.copy(this.cameraPos).add(dir);
   }
 
+  /** North-star underwater frame: cube + surface (Snell window / TIR). */
+  lookAtCubeUnderwater(): void {
+    const d = this.params.cubeDepth;
+    this.cameraPos.set(0, Math.min(-0.6, d + 1.2), 4.0);
+    this.cameraTarget.set(0, d, 0);
+  }
+
+  /** North-star above-water frame: look down through interface at submerged cube. */
+  lookAtCubeAbove(): void {
+    const d = this.params.cubeDepth;
+    this.cameraPos.set(0, 3.2, 5.0);
+    this.cameraTarget.set(0, d, 0);
+  }
+
   setUnderwaterView(underwater: boolean): void {
     if (this.params.underwaterView === underwater) return;
     this.params.underwaterView = underwater;
-    if (underwater) {
-      this.cameraPos.set(0, -1.2, 3.5);
-      this.updateCameraTargetFromAngles(0, -0.15);
-    } else {
-      this.cameraPos.set(0, 2.5, 5);
-      this.updateCameraTargetFromAngles(0, -0.3);
-    }
+    if (underwater) this.lookAtCubeUnderwater();
+    else this.lookAtCubeAbove();
     this.onCameraMoved?.();
     this.markSceneChanged();
   }
@@ -597,25 +611,70 @@ export class PathTracer {
     if (!this.params.autoOrbit) return;
     this.orbitPhase += dt * 0.25;
     const radius = this.params.underwaterView ? 4.5 : 6;
-    const y = this.params.underwaterView ? -1.2 + Math.sin(this.orbitPhase * 0.5) * 0.3 : 2.5;
+    const y = this.params.underwaterView
+      ? Math.min(-0.6, this.params.cubeDepth + 1.2) + Math.sin(this.orbitPhase * 0.5) * 0.25
+      : 3.0;
     this.cameraPos.x = Math.sin(this.orbitPhase) * radius;
     this.cameraPos.z = Math.cos(this.orbitPhase) * radius;
     this.cameraPos.y = y;
-    const yaw = this.orbitPhase + Math.PI;
-    const pitch = this.params.underwaterView ? -0.12 : -0.28;
-    this.updateCameraTargetFromAngles(yaw, pitch);
+    // Always keep the cube as the look-at so orbit demonstrates interface physics, not empty water
+    this.cameraTarget.set(0, this.params.cubeDepth, 0);
 
     if (this.params.activeChapter === 'atmosphere') {
       this.params.sunElevation = 0.05 + (Math.sin(this.orbitPhase * 0.3) * 0.5 + 0.5) * 0.85;
     }
   }
 
+  /**
+   * Scene is "dynamic" when geometry/time changes between frames.
+   * Blending dynamic frames causes ghosting/spotty caustics — the root cause of the "spotty" look.
+   * LIVE mode: one-sample-per-frame path-trace, no history.
+   * STILL mode: freeze waves + cube, progressive 1/N accumulation.
+   */
+  isSceneDynamic(): boolean {
+    if (!this.params.animateWaves) return false;
+    const cubeSpinning =
+      Math.abs(this.params.cubeRotSpeedY) > 1e-6 || Math.abs(this.params.cubeRotSpeedX) > 1e-6;
+    const wavesMoving = this.params.waveAmplitude > 1e-5 && this.params.timeScale > 1e-5;
+    return cubeSpinning || wavesMoving || this.params.autoOrbit;
+  }
+
+  getRenderMode(): 'live' | 'still' {
+    return this.renderMode;
+  }
+
+  getAccumSampleCount(): number {
+    return this.accumSampleCount;
+  }
+
+  /** Freeze waves + cube spin and reset buffer so progressive path-trace can converge. */
+  freezeForCapture(): void {
+    this.params.animateWaves = false;
+    this.params.autoOrbit = false;
+    this.markSceneChanged();
+  }
+
+  /** Resume live animated path-trace (noisy, no ghost blend). */
+  unfreezeLive(): void {
+    this.params.animateWaves = true;
+    this.markSceneChanged();
+  }
+
+  setAnimateScene(on: boolean): void {
+    if (this.params.animateWaves === on) return;
+    this.params.animateWaves = on;
+    if (!on) this.params.autoOrbit = false;
+    this.markSceneChanged();
+  }
+
   private advanceSimulation(dt: number): void {
+    // Only advance time/spin when animating. STILL mode freezes the entire dielectric scene
+    // so TIR escape angles, caustics, and Snell paths are consistent across samples.
     if (this.params.animateWaves) {
       this.simTime += dt * this.params.timeScale;
+      this.cubeRotY += this.params.cubeRotSpeedY;
+      this.cubeRotX += this.params.cubeRotSpeedX;
     }
-    this.cubeRotY += this.params.cubeRotSpeedY;
-    this.cubeRotX += this.params.cubeRotSpeedX;
 
     if (this.params.fixationMode) {
       this.fixationHold = Math.min(10, this.fixationHold + dt);
@@ -695,6 +754,11 @@ export class PathTracer {
     this.advanceSimulation(dt);
 
     const camMoving = this.isCameraInMotion();
+    const sceneDynamic = this.isSceneDynamic();
+    // LIVE whenever camera moves OR the dielectric scene is animating.
+    // Only STILL (frozen) scenes may progressive-accumulate — otherwise caustics ghost.
+    const live = camMoving || sceneDynamic || !this.cameraSettled;
+    this.renderMode = live ? 'live' : 'still';
 
     if (camMoving) {
       this.settleCooldown = 0.4;
@@ -718,38 +782,49 @@ export class PathTracer {
     this.lastCamTarget.copy(this.cameraTarget);
 
     const u = this.material.uniforms;
-    const interacting = camMoving || !this.cameraSettled;
-    u.cameraInteracting.value = interacting ? 1.0 : 0.0;
-    u.resetAccum.value = interacting || this.needsReset ? 1.0 : 0.0;
-    u.temporalBlend.value = interacting ? 1.0 : this.params.temporalBlend;
+    // cameraInteracting = "do not blend history" (live single-frame path-trace)
+    u.cameraInteracting.value = live ? 1.0 : 0.0;
+    u.resetAccum.value = live || this.needsReset ? 1.0 : 0.0;
+    // Progressive weight computed in shader from accumSampleCount when still.
+    // temporalBlend kept as fallback floor for very early samples only.
+    u.temporalBlend.value = live ? 1.0 : this.params.temporalBlend;
 
     this.updateUniforms();
 
     const readIdx = this.ping;
     const writeIdx = 1 - this.ping;
     const sampleInterval = 1000 / Math.max(1, this.params.sampleFps);
-    const shouldSample = interacting || now - this.lastSampleTime >= sampleInterval;
+    const atBudget =
+      !live && this.accumSampleCount >= this.params.maxAccumSamples && !this.needsReset;
+    // LIVE: sample every display frame for real-time path-trace feel.
+    // STILL: throttle by sampleFps until budget, then hold display.
+    const shouldSample =
+      !atBudget && (live || this.needsReset || now - this.lastSampleTime >= sampleInterval);
 
     if (shouldSample) {
       u.accumTexture.value = this.accumTargets[readIdx].texture;
       u.displayOnly.value = 0.0;
-      if (interacting) u.resetAccum.value = 1.0;
+      if (live) u.resetAccum.value = 1.0;
 
       this.renderer.setRenderTarget(this.accumTargets[writeIdx]);
       this.renderer.render(this.scene, this.orthoCam);
       this.ping = writeIdx;
       this.lastSampleTime = now;
 
-      if (!interacting) {
+      if (!live) {
         this.accumSampleCount = Math.min(
           this.accumSampleCount + this.params.samplesPerFrame,
           this.params.maxAccumSamples,
         );
         this.needsReset = false;
+      } else {
+        // Live path-trace: each frame stands alone; counter shows "1" for clarity.
+        this.accumSampleCount = this.params.samplesPerFrame;
+        this.needsReset = false;
       }
     }
 
-    const displayIdx = shouldSample ? writeIdx : readIdx;
+    const displayIdx = shouldSample ? writeIdx : this.ping;
     u.accumTexture.value = this.accumTargets[displayIdx].texture;
     u.displayOnly.value = 1.0;
     this.renderer.setRenderTarget(null);
@@ -766,10 +841,14 @@ export class PathTracer {
   }
 
   getStats(): string {
-    const pct = Math.min(100, Math.round((this.accumSampleCount / this.params.maxAccumSamples) * 100));
     const { w, h } = this.renderSize();
     const ch = this.params.activeChapter;
-    return `Samples ${this.accumSampleCount}/${this.params.maxAccumSamples} (${pct}%) · ${w}×${h} · ${ch}`;
+    if (this.renderMode === 'live') {
+      return `LIVE path-trace · ${this.params.samplesPerFrame} spp · ${w}×${h} · ${ch} · uncheck Animate for clean accum`;
+    }
+    const pct = Math.min(100, Math.round((this.accumSampleCount / this.params.maxAccumSamples) * 100));
+    const done = this.accumSampleCount >= this.params.maxAccumSamples ? ' DONE' : '';
+    return `STILL accum ${this.accumSampleCount}/${this.params.maxAccumSamples} (${pct}%)${done} · ${w}×${h} · ${ch}`;
   }
 
   getGpuInfo(): string {

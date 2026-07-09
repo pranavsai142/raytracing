@@ -89,7 +89,9 @@ export function setupUI(tracer: PathTracer): void {
 
   const animateWaves = document.getElementById('animate-waves') as HTMLInputElement;
   animateWaves.addEventListener('change', () => {
-    tracer.params.animateWaves = animateWaves.checked;
+    // Critical: freeze freezes waves AND cube so progressive path-trace can converge.
+    // LIVE mode never blends history (avoids spotty ghost caustics).
+    tracer.setAnimateScene(animateWaves.checked);
   });
 
   const btnAbove = document.getElementById('view-above')!;
