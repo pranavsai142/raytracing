@@ -375,6 +375,20 @@ export interface SimParams {
   complementStrength: number;
   secondaryReflectWeight: number;
   floorReflectance: number;
+  floorHeight: number;
+  floorEnabled: boolean;
+  /** 0 uniform, 1 gravel, 2 sand, 3 splitYw, 4 checker */
+  floorPattern: number;
+  floorAlbedoColor: [number, number, number];
+  floorAlbedoScale: number;
+  floorBumpAmp: number;
+  floorBumpFreq: number;
+  floorBumpOctaves: number;
+  floorRoughness: number;
+  /** 0 diffuse, 1 glossy, 2 mirror */
+  floorMaterial: number;
+  floorSpecular: number;
+  floorCheckerScale: number;
   flameEdgeBoost: number;
   moonElevation: number;
   moonAzimuth: number;
@@ -406,6 +420,12 @@ function createAccumTarget(w: number, h: number, type: THREE.TextureDataType): T
 }
 
 const ABSORPTION_MAP: Record<AbsorptionModel, number> = { neutral: 0, beer: 1, goethe: 2 };
+
+/** Goethe §76/§56 seafloor plane Y (rod base). */
+const GOETHE_FLOOR_HEIGHT = -5.8;
+
+/** Named seafloor substrate presets (UI buttons + applyFloorPreset). */
+export type FloorPresetName = 'abyss' | 'sand' | 'gravel' | 'white' | 'mirror' | 'split';
 
 export class PathTracer {
   private renderer: THREE.WebGLRenderer;
@@ -447,28 +467,29 @@ export class PathTracer {
     sunIntensity: 1.2,
     volumeSigma: 0.05,
     volumeG: 0.55,
-    samplesPerFrame: 1,
+    samplesPerFrame: 2,
     maxAccumSamples: 256,
     temporalBlend: 0.05,
-    exposure: 1.35,
-    vignetteStrength: 0.25,
-    waveAmplitude: 0.08,
+    exposure: 1.5,
+    vignetteStrength: 0.22,
+    waveAmplitude: 0.06,
     waveFrequency: 0.5,
     waveSpeed: 0.6,
     wavePreset: 'multi-octave',
-    waveComponents: buildMultiOctaveComponents(0.08, 0.5, 0.6),
+    waveComponents: buildMultiOctaveComponents(0.06, 0.5, 0.6),
     timeScale: 0.15,
-    // Default LIVE: animated ocean. Uncheck "Animate Scene" (or freezeForCapture) for clean progressive path-trace.
-    animateWaves: true,
+    // Production first-run: STILL freeze so progressive path-trace cleans the hero frame.
+    // User turns Animate ON for LIVE.
+    animateWaves: false,
     cubeDepth: -2.2,
     cubeRotSpeedY: 0.004,
     cubeRotSpeedX: 0.002,
-    fov: 55,
+    fov: 58,
     moveSpeed: 1.2,
     moveAccel: 3.5,
     moveDamping: 6.0,
     mouseSensitivity: 0.0018,
-    renderScale: 0.75,
+    renderScale: 0.85,
     sampleFps: 30,
     underwaterView: true,
     autoOrbit: false,
@@ -490,6 +511,18 @@ export class PathTracer {
     complementStrength: 0,
     secondaryReflectWeight: 0,
     floorReflectance: 0.15,
+    floorHeight: -3.5,
+    floorEnabled: true,
+    floorPattern: 1, // gravel
+    floorAlbedoColor: [0.55, 0.48, 0.32],
+    floorAlbedoScale: 0.4,
+    floorBumpAmp: 0.06,
+    floorBumpFreq: 2.5,
+    floorBumpOctaves: 3,
+    floorRoughness: 0.55,
+    floorMaterial: 0, // diffuse
+    floorSpecular: 0.05,
+    floorCheckerScale: 0,
     flameEdgeBoost: 0,
     moonElevation: -0.15,
     moonAzimuth: 2.5,
@@ -578,178 +611,533 @@ export class PathTracer {
     this.params.candleIntensity = 0;
     this.params.secondaryReflectWeight = 0;
 
-    /** When a chapter sets waveAmplitude, force multi-octave so GPU height matches (custom is otherwise a no-op). */
-    let waveMacrosTouched = false;
+    // Chapter hero quality: full internal resolution + richer paths so every § reads clearly.
+    // (User-fixed atmosphere ugliness by raising render scale — apply that to all chapters.)
+    this.params.renderScale = 1.0;
+    this.params.samplesPerFrame = Math.max(this.params.samplesPerFrame, 2);
+    this.params.maxBounces = Math.max(this.params.maxBounces, 6);
+    this.params.exposure = 1.35;
+    this.params.vignetteStrength = 0.2;
+    this.params.sunIntensity = 1.2;
+    this.params.fillIntensity = 0.35;
+    this.params.fillTint = [0.7, 0.85, 1.0];
+    this.params.volumeSigma = 0.05;
+    this.params.turbidity = 0.05;
+    this.params.atmosphereDensity = 0.5;
+    this.params.mediumThickness = 0.3;
+    this.params.dispersion = 0.012;
+    this.params.interfaceRoughness = 0.06;
+    this.params.absorptionModel = 'neutral';
+    this.params.scatterTint = [1, 1, 1];
+    this.params.cubeDepth = -2.2;
+    // Ocean floor bundle (gravel substrate; water colour from physics, not floor pigment)
+    this.params.floorHeight = -3.5;
+    this.params.floorEnabled = true;
+    this.params.floorReflectance = 0.15;
+    this.params.floorPattern = 1; // gravel
+    this.params.floorAlbedoColor = [0.55, 0.48, 0.32]; // warm sand gravel
+    this.params.floorAlbedoScale = 0.4;
+    this.params.floorBumpAmp = 0.06; // med
+    this.params.floorBumpFreq = 2.5;
+    this.params.floorBumpOctaves = 3;
+    this.params.floorRoughness = 0.55;
+    this.params.floorMaterial = 0; // diffuse
+    this.params.floorSpecular = 0.05;
+    this.params.floorCheckerScale = 0;
+    this.params.fov = 55;
+    this.params.timeScale = 0.15;
+    this.params.waveAmplitude = 0.08;
+    this.params.waveFrequency = 0.5;
+    this.params.waveSpeed = 0.6;
+    this.params.wavePreset = 'multi-octave';
+    let waveMacrosTouched = true;
 
     switch (id) {
       case 'ocean':
+        // North-star dielectric: cube + Snell window + TIR trap/escape + caustics
         this.params.underwaterView = true;
-        // Frame the sacred cube: Snell window above, cube filling view, TIR around edges
+        this.params.dispersion = 0.02;
+        this.params.maxBounces = 10;
+        this.params.sunElevation = 0.85;
+        this.params.sunAzimuth = 0.35;
+        this.params.sunIntensity = 1.55;
+        this.params.exposure = 1.5;
+        this.params.volumeSigma = 0.03;
+        this.params.interfaceRoughness = 0.02;
+        this.params.waveAmplitude = 0.06;
         this.lookAtCubeUnderwater();
+        // Cube dominant mid-frame; surface strip above = Snell bright + TIR dark rim
+        this.cameraPos.set(0.3, -0.7, 3.35);
+        this.cameraTarget.set(0, this.params.cubeDepth + 0.35, 0);
+        this.params.fov = 58;
         break;
 
       case 'primordial':
-        this.params.sunElevation = 0.12;
-        this.params.mediumThickness = 0.6;
-        this.params.atmosphereDensity = 1.0;
-        this.params.volumeSigma = 0.04;
-        this.params.turbidity = 0.4;
+        // §175: light + darkness + colourless medium → colour; thickness modulates
+        // Low warm sun through medium; cool overhead / warm horizon; not blue-paint water
+        this.params.sunElevation = 0.06;
+        this.params.sunAzimuth = 0.45;
+        this.params.sunIntensity = 1.85;
+        this.params.mediumThickness = 1.05;
+        this.params.atmosphereDensity = 1.45;
+        this.params.volumeSigma = 0.016;
+        this.params.turbidity = 0.1;
+        this.params.mediumTint = [1, 1, 1];
+        this.params.scatterTint = [1, 1, 1];
+        this.params.volumeTint = [1, 1, 1];
+        this.params.absorptionModel = 'neutral';
+        this.params.exposure = 1.28;
+        this.params.fillIntensity = 0.15;
         this.params.underwaterView = false;
-        this.cameraPos.set(0, 2.5, 5);
-        this.updateCameraTargetFromAngles(0, -0.25);
+        this.params.waveAmplitude = 0.03;
+        // Frame low sun on horizon — warm airmass glow vs cooler upper sky
+        // sunDir ≈ (cos0.45*cos0.06, sin0.06, sin0.45*cos0.06) ≈ (0.90, 0.06, 0.43)
+        this.cameraPos.set(0, 1.05, 5.2);
+        this.cameraTarget.set(18, 2.0, 8.8);
+        this.params.fov = 56;
         break;
 
       case 'atmosphere':
-        this.params.atmosphereDensity = 1.2;
-        this.params.sunElevation = 0.35;
-        this.params.autoOrbit = true;
-        this.params.flameEdgeBoost = 0.6;
+        // §155: sky blue = darkness through illumined vapour; sun through mist warms
+        // Prior bug: camera looked −Z while sun sat near +X/+Z → no disk, muddy flat sky.
+        this.params.atmosphereDensity = 1.7; // Rayleigh cool upper sky
+        this.params.mediumThickness = 1.05; // warm solar / horizon vapour
+        this.params.turbidity = 0.42;
+        this.params.volumeSigma = 0.012;
+        this.params.sunElevation = 0.08; // low sun on misty horizon → yellow→ruby
+        this.params.sunAzimuth = 0.5;
+        this.params.sunIntensity = 2.25;
+        this.params.exposure = 1.52;
+        this.params.fillIntensity = 0.1; // don't wash warm solar limb with cool fill
+        this.params.flameEdgeBoost = 0.25; // subtle sceneMode=2 edge; sky is the hero
         this.params.underwaterView = false;
-        this.cameraPos.set(0, 2.5, 5);
-        this.updateCameraTargetFromAngles(0, -0.3);
+        this.params.waveAmplitude = 0.015;
+        this.params.autoOrbit = false; // still-readable hero; user can re-enable orbit
+        // Low eye over water: horizon band + sun glow mid-frame, cooler sky above
+        // sunDir ≈ (cos0.5·cos0.08, sin0.08, sin0.5·cos0.08) ≈ (0.87, 0.08, 0.48)
+        this.cameraPos.set(0.0, 1.15, 4.8);
+        this.cameraTarget.set(16.0, 1.9, 9.0);
+        this.params.fov = 58;
         break;
 
       case 'shadows':
-        this.params.sunElevation = 0.15;
-        this.params.sunIntensity = 1.4;
-        this.params.fillIntensity = 0.5;
-        this.params.fillTint = [0.7, 0.85, 1.0];
-        this.params.exposure = 1.8;
-        this.params.underwaterView = false;
-        this.cameraPos.set(1.2, 2.0, 3);
-        this.updateCameraTargetFromAngles(-0.5, -0.5);
+        // §76: contrary light fills the shadow → complementary coloured shadows
+        // Warm principal (sun) + cool contrary (fill). Floor lit by both; each light's
+        // umbra is filled by the other → two tinted shadows; double-umbra nearly black.
+        this.params.sunElevation = 0.38;
+        this.params.sunAzimuth = 0.9;
+        this.params.sunIntensity = 2.25;
+        this.params.fillIntensity = 1.4;
+        this.params.fillDir = [-0.75, 0.5, -0.4]; // orthogonal fan vs sun umbra
+        this.params.fillTint = [0.12, 0.32, 1.0]; // strong cool contrary light
+        this.params.exposure = 1.15;
+        this.params.floorReflectance = 0.95;
+        this.params.volumeSigma = 0.003; // clear so floor tints aren't muddied
+        this.params.turbidity = 0.01;
+        this.params.waveAmplitude = 0; // freeze surface; dual shadows stay sharp
+        this.params.underwaterView = true;
+        this.params.cubeDepth = -9.0; // park cube below floor — rod/floor is the hero
+        this.params.floorHeight = GOETHE_FLOOR_HEIGHT;
+        // Bright flat white card (Slice C params win over sceneMode albedo)
+        this.params.floorPattern = 0;
+        this.params.floorAlbedoColor = [1.0, 1.0, 1.0];
+        this.params.floorAlbedoScale = 0.9;
+        this.params.floorBumpAmp = 0;
+        this.params.floorMaterial = 0;
+        // Slightly elevated: rod upright, warm sun-umbra one way, cool fill-umbra the other
+        this.cameraPos.set(1.35, -3.85, 2.55);
+        this.cameraTarget.set(0.35, this.params.floorHeight, -0.2);
+        this.params.fov = 48;
         break;
 
       case 'shadows-underwater':
-        this.params.sunElevation = 0.15;
-        this.params.fillIntensity = 0.45;
-        this.params.fillTint = [0.7, 0.85, 1.0];
-        this.params.volumeSigma = 0.08;
-        this.params.complementStrength = 0.25;
+        // §78: divers — sunlight into diving-bell → red-biased field, green shadows
+        // Deeper eye (less floor mint wash); beer/warm medium for red field; green fill + complement on cube.
+        // Modest sand floor — readable underwater, not white-card wash
+        this.params.floorHeight = -3.5;
+        this.params.floorPattern = 2; // sand
+        this.params.floorAlbedoColor = [0.58, 0.48, 0.34];
+        this.params.floorAlbedoScale = 0.38;
+        this.params.floorBumpAmp = 0.04;
+        this.params.floorMaterial = 0;
+        this.params.sunElevation = 0.88;
+        this.params.sunAzimuth = 0.35;
+        this.params.sunIntensity = 2.0;
+        this.params.fillIntensity = 0.72;
+        this.params.fillDir = [0.25, 0.35, 0.9];
+        this.params.fillTint = [0.3, 0.98, 0.45];
+        this.params.volumeSigma = 0.11;
+        this.params.turbidity = 0.14;
+        this.params.absorptionModel = 'beer';
+        this.params.sigmaLambda = [0.02, 0.2, 0.85];
+        this.params.scatterTint = [1.55, 0.55, 0.35];
+        this.params.volumeTint = [1.4, 0.75, 0.5];
+        this.params.mediumTint = [1.9, 0.5, 0.28];
+        this.params.mediumThickness = 1.2;
+        this.params.atmosphereDensity = 0.18;
+        this.params.complementStrength = 0.8;
+        this.params.exposure = 1.45;
+        this.params.waveAmplitude = 0.02;
         this.params.underwaterView = true;
+        this.params.cubeDepth = -2.3;
         this.lookAtCubeUnderwater();
-        this.cameraPos.x = 0.6;
-        this.cameraTarget.set(0, this.params.cubeDepth, 0);
+        // Deeper, slightly upward: cube + surface band; avoid green-lit floor filling the frame
+        this.cameraPos.set(0.55, -1.05, 3.35);
+        this.cameraTarget.set(0.0, this.params.cubeDepth + 0.55, 0.0);
+        this.params.fov = 52;
         break;
 
       case 'contrast':
+        // §56: white on yellow → purple tint (physiological layer labeled)
+        // Hero = split floor boundary (sceneMode 4); cube parked off-stage.
         this.params.physiologicalContrast = true;
-        this.params.opponentStrength = 0.5;
-        this.params.dispersion = 0.03;
-        this.params.underwaterView = false;
-        this.cameraPos.set(0, 2.2, 2.5);
-        this.updateCameraTargetFromAngles(0, -0.55);
+        this.params.opponentStrength = 0.9;
+        this.params.dispersion = 0.012;
+        this.params.sunElevation = 0.75;
+        this.params.sunAzimuth = 0.15;
+        this.params.sunIntensity = 1.7;
+        this.params.exposure = 1.25;
+        this.params.fillIntensity = 0.2;
+        this.params.fillTint = [0.9, 0.9, 1.0];
+        this.params.volumeSigma = 0.002; // clear so yellow|white read pure
+        this.params.turbidity = 0.01;
+        this.params.floorReflectance = 0.7;
+        this.params.underwaterView = true; // in-water: no surface sheen washing tints
+        this.params.waveAmplitude = 0; // freeze surface; boundary stays sharp
+        this.params.cubeDepth = -9.0; // park cube below floor
+        this.params.floorHeight = GOETHE_FLOOR_HEIGHT;
+        // Yellow|white split floor (Slice C params; pattern 3)
+        this.params.floorPattern = 3;
+        this.params.floorAlbedoScale = 0.92;
+        this.params.floorBumpAmp = 0;
+        this.params.floorMaterial = 0;
+        // Close above floor: vertical yellow|white seam centered; rod as scale cue only
+        this.cameraPos.set(0.05, -4.15, 1.9);
+        this.cameraTarget.set(0.0, this.params.floorHeight, -0.15);
+        this.params.fov = 50;
         break;
 
       case 'refraction':
-        this.params.dispersion = 0.02;
-        this.params.interfaceRoughness = 0.02;
-        this.params.maxBounces = 8;
-        this.params.waveAmplitude = 0.06;
-        waveMacrosTouched = true;
+        // §227: displacement at boundaries produces colour
+        // Cube near interface so silhouette meets Snell bright / TIR dark → spectral edges
+        this.params.cubeDepth = -1.7; // closer to surface: boundary displacement reads
+        this.params.dispersion = 0.05; // max UI — λ-dependent IOR fringes / chromatic caustics
+        this.params.interfaceRoughness = 0.008; // sharp water plane
+        this.params.maxBounces = 10;
+        this.params.waveAmplitude = 0.035; // mild caustic topology without washout
+        this.params.sunElevation = 0.92;
+        this.params.sunAzimuth = 0.28;
+        this.params.sunIntensity = 1.9;
+        this.params.exposure = 1.5;
+        this.params.volumeSigma = 0.022; // clear water — cube edges stay crisp
+        this.params.fillIntensity = 0.22;
         this.params.underwaterView = true;
-        // Closer + slightly up: cube + wave surface caustics in one frame
-        this.cameraPos.set(0, -0.55, 3.2);
-        this.cameraTarget.set(0, this.params.cubeDepth + 0.3, 0);
+        // Upper third: interface (Snell + TIR); cube fills mid — light edge over dark volume
+        this.cameraPos.set(0.25, -0.48, 2.95);
+        this.cameraTarget.set(0, this.params.cubeDepth + 0.35, 0);
+        this.params.fov = 54;
         break;
 
       case 'double-reflect':
-        this.params.waveAmplitude = 0;
-        waveMacrosTouched = true;
-        this.params.secondaryReflectWeight = 0.4;
-        this.params.floorReflectance = 0.2;
+        // §224: separated reflections weak and shadowy; calm surface
+        // Near-calm micro-slope + microfacet so secondary floor path can fire (shader needs
+        // slightly downward external reflects); still reads as flat water.
+        // Mirror floor plane + high reflectance for secondary stand reflection
+        this.params.floorHeight = -2.5;
+        this.params.floorPattern = 0; // uniform
+        this.params.floorAlbedoColor = [0.95, 0.95, 0.98];
+        this.params.floorAlbedoScale = 0.8;
+        this.params.floorBumpAmp = 0;
+        this.params.floorMaterial = 2; // mirror
+        this.params.floorSpecular = 1.0;
+        this.params.floorRoughness = 0.02;
+        this.params.waveAmplitude = 0.005;
+        this.params.waveFrequency = 0.22;
+        this.params.waveSpeed = 0.15;
+        this.params.secondaryReflectWeight = 0.95;
+        this.params.floorReflectance = 0.9;
+        this.params.interfaceRoughness = 0.015;
+        this.params.volumeSigma = 0.014;
+        this.params.turbidity = 0.01;
+        this.params.atmosphereDensity = 0.26;
+        this.params.mediumThickness = 0.16;
+        this.params.sunElevation = 0.4;
+        this.params.sunAzimuth = 0.75;
+        this.params.sunIntensity = 1.8;
+        this.params.exposure = 1.32;
+        this.params.fillIntensity = 0.16;
+        this.params.maxBounces = 9;
         this.params.underwaterView = false;
-        this.cameraPos.set(0, 1.5, 4);
-        this.updateCameraTargetFromAngles(0, -0.35);
+        // Slightly lower/farther: more Fresnel calm plane + cube; soft stand secondary
+        this.cameraPos.set(1.15, 1.2, 4.0);
+        this.cameraTarget.set(0.0, -0.55, -0.15);
+        this.params.fov = 48;
         break;
 
       case 'afterimage':
+        // §50: opponent colour floats on neutral ground (viewer layer)
+        // Hero = sceneMode-7 grey plane (y=1.5) + display-pass fixation/opponent — not water pigment.
         this.params.fixationMode = true;
+        this.params.physiologicalContrast = true;
+        this.params.opponentStrength = 1.0; // max still-readable opponent push on grey
+        // Pre-warm hold so STILL smoke (few real-time seconds) shows full fixationStrength
+        this.fixationHold = 8;
+        this.params.sunElevation = 0.9;
+        this.params.sunAzimuth = 0.1;
+        this.params.sunIntensity = 0.85;
+        this.params.exposure = 1.1;
+        this.params.fillIntensity = 0.55;
+        this.params.fillTint = [1.0, 1.0, 1.0]; // neutral — avoid cool green cast on grey
+        this.params.atmosphereDensity = 0.12;
+        this.params.mediumThickness = 0.08;
+        this.params.volumeSigma = 0.002;
+        this.params.turbidity = 0.01;
         this.params.underwaterView = false;
-        this.cameraPos.set(0, 1.8, 3);
-        this.updateCameraTargetFromAngles(0, -0.2);
+        this.params.waveAmplitude = 0;
+        this.params.cubeDepth = -9.0; // park cube — grey plane + viewer layer are the §
+        this.params.vignetteStrength = 0.12;
+        // Overhead onto grey plane: full-frame neutral ground for fixation afterimage float
+        this.cameraPos.set(0.0, 3.4, 0.6);
+        this.cameraTarget.set(0.0, 1.5, 0.0);
+        this.params.fov = 52;
         break;
 
       case 'twilight':
-        this.params.sunElevation = 0.06;
-        this.params.sunIntensity = 0.15;
-        this.params.exposure = 2.2;
-        this.params.fillIntensity = 0.4;
-        this.params.moonIntensity = 0.25;
-        this.params.candleIntensity = 0.6;
+        // §85: faint lights appear coloured at night; moon disk + warm candle-fill
+        // Root cause of prior fog soup: moon sat behind camera (az 2.2 vs look −Z)
+        // and atmosphereDensity 0.9 buried both lights in Rayleigh wash.
+        this.params.sunElevation = 0.02;
+        this.params.sunAzimuth = 2.8; // sun opposite / out of frame — not day
+        this.params.sunIntensity = 0.05;
+        this.params.exposure = 2.15; // lift faint lights without blowing moon white
+        // Night sky: dim cooler medium so moon / candle read as coloured lights
+        this.params.atmosphereDensity = 0.32;
+        this.params.mediumThickness = 0.2;
+        this.params.mediumTint = [0.28, 0.34, 0.52];
+        this.params.volumeSigma = 0.015;
+        this.params.turbidity = 0.02;
+        // Moon disk upper sky (cream–yellow env lobe) — moderate so colour survives tonemap
+        this.params.moonIntensity = 0.95;
+        this.params.moonElevation = 0.28;
+        this.params.moonAzimuth = -1.68;
+        this.params.candleIntensity = 1.0; // UI/param; warm local via fill (shader candle unused)
+        // Warm candle proxy: yellow–orange fill on cube / near surfaces
+        this.params.fillIntensity = 1.45;
+        this.params.fillTint = [1.0, 0.48, 0.12];
+        this.params.fillDir = [0.15, 0.75, 0.45];
         this.params.complementStrength = 0.3;
         this.params.underwaterView = false;
-        this.cameraPos.set(0, 1.2, 4);
-        this.updateCameraTargetFromAngles(0, -0.2);
+        this.params.waveAmplitude = 0.02;
+        this.params.cubeDepth = -1.55;
+        // Low eye: cube lower third; moon upper sky along −Z
+        this.cameraPos.set(0.4, 1.0, 3.5);
+        this.cameraTarget.set(0.0, 0.2, -0.8);
+        this.params.fov = 58;
         break;
 
       case 'goethe-colourless-water':
-        this.params.volumeSigma = 0.01;
-        this.params.turbidity = 0.01;
+        // §161: water has no colour; slight semi-opacity is not pigment.
+        // sceneMode≥3 → light floor (not default dark-blue seabed) so bulk isn't
+        // misread as blue dye; neutral scatter/volume tints only.
+        // Demo A: pale sand substrate (floor is substrate, not water pigment)
+        this.params.floorHeight = -3.0;
+        this.params.floorPattern = 2; // sand
+        this.params.floorAlbedoColor = [0.62, 0.54, 0.38];
+        this.params.floorAlbedoScale = 0.55;
+        this.params.floorBumpAmp = 0.025; // low
+        this.params.floorMaterial = 0;
+        this.params.sceneMode = 5;
+        this.params.volumeSigma = 0.004;
+        this.params.turbidity = 0.02; // "deprived slightly of transparency"
         this.params.scatterTint = [1, 1, 1];
+        this.params.volumeTint = [1, 1, 1];
+        this.params.mediumTint = [1, 1, 1];
         this.params.absorptionModel = 'neutral';
-        this.params.dispersion = 0.008;
-        this.params.sunElevation = 0.7;
-        this.params.waveAmplitude = 0.02;
-        waveMacrosTouched = true;
-        this.params.cubeDepth = -2.2;
-        this.params.exposure = 1.2;
+        this.params.dispersion = 0.008; // edge fringes only, not body colour
+        this.params.sunElevation = 0.82;
+        this.params.sunAzimuth = 0.4;
+        this.params.sunIntensity = 1.7; // white high sun — "highest light colourless"
+        this.params.fillIntensity = 0.2;
+        this.params.fillTint = [1.0, 1.0, 0.98]; // no cool blue fill wash
+        this.params.atmosphereDensity = 0.14; // cut Rayleigh blue-as-water misread
+        this.params.mediumThickness = 0.08;
+        this.params.waveAmplitude = 0.018;
+        this.params.interfaceRoughness = 0.02;
+        this.params.floorReflectance = 0.55;
+        this.params.exposure = 1.35;
+        this.params.cubeDepth = -1.7; // shorter water path → less bulk path colour
         this.params.underwaterView = false;
         this.lookAtCubeAbove();
+        // Oblique above: cube through surface; pale neutral veil, not teal murk
+        this.cameraPos.set(0.55, 2.15, 3.7);
+        this.cameraTarget.set(0.0, this.params.cubeDepth + 0.2, -0.1);
+        this.params.fov = 48;
         break;
 
       case 'diver-view':
+        // §78: diving-bell — everything in red light; shadows green
+        // Beer + warm medium for red field; green contrary fill + complement on umbrae
+        // Ocean-ish gravel floor (substrate; field colour from Beer medium)
+        this.params.floorHeight = -3.5;
+        this.params.floorPattern = 1; // gravel
+        this.params.floorAlbedoColor = [0.55, 0.48, 0.32];
+        this.params.floorAlbedoScale = 0.4;
+        this.params.floorBumpAmp = 0.06;
+        this.params.floorMaterial = 0;
         this.params.underwaterView = true;
-        this.params.sunElevation = 0.85;
+        this.params.sunElevation = 0.9;
+        this.params.sunAzimuth = 0.32;
+        this.params.sunIntensity = 2.05;
         this.params.absorptionModel = 'beer';
-        this.params.turbidity = 0.1;
-        this.params.volumeSigma = 0.08;
-        this.params.fillIntensity = 0.4;
-        this.params.complementStrength = 0.35;
+        this.params.sigmaLambda = [0.02, 0.22, 0.92]; // blue-heavy absorb → red field
+        this.params.volumeSigma = 0.12;
+        this.params.turbidity = 0.13;
+        this.params.scatterTint = [1.65, 0.48, 0.3];
+        this.params.volumeTint = [1.5, 0.68, 0.42];
+        this.params.mediumTint = [2.0, 0.45, 0.24];
+        this.params.mediumThickness = 1.2;
+        this.params.atmosphereDensity = 0.14;
+        this.params.fillIntensity = 0.78;
+        this.params.fillDir = [0.28, 0.38, 0.88];
+        this.params.fillTint = [0.25, 0.98, 0.4]; // green contrary light
+        this.params.complementStrength = 0.78;
+        this.params.exposure = 1.42;
+        this.params.dispersion = 0.012;
+        this.params.waveAmplitude = 0.02;
+        this.params.cubeDepth = -2.25;
         this.lookAtCubeUnderwater();
+        // Cube clear mid-frame; slight up-look for warm surface band, less floor mint wash
+        this.cameraPos.set(0.45, -1.0, 3.35);
+        this.cameraTarget.set(0, this.params.cubeDepth + 0.5, 0);
+        this.params.fov = 54;
         break;
 
       case 'vessel-elevation':
+        // §187 elevation (hebung): look diagonally into vessel; bottom raised by refraction.
+        // Theory: diagonal sight that misses the dry bottom brings the wet bottom into view.
+        // Light floor + rod = vessel-bottom cues; calm clear water; air-side IOR raises cube.
+        // Raised sand bottom under cube (cubeDepth ~-1.55)
+        this.params.floorHeight = -2.3;
+        this.params.floorPattern = 2; // sand
+        this.params.floorAlbedoColor = [0.6, 0.52, 0.38];
+        this.params.floorAlbedoScale = 0.7;
+        this.params.floorBumpAmp = 0.03; // low
+        this.params.floorMaterial = 0;
+        this.params.sceneMode = 5;
         this.params.volumeSigma = 0.005;
-        this.params.turbidity = 0.005;
+        this.params.turbidity = 0.015; // slight path presence, not murk
         this.params.scatterTint = [1, 1, 1];
-        this.params.cubeDepth = -1.5;
+        this.params.volumeTint = [1, 1, 1];
+        this.params.mediumTint = [1, 1, 1];
+        this.params.absorptionModel = 'neutral';
+        this.params.waterIOR = 1.33;
+        this.params.cubeDepth = -1.55; // submerged; refract → apparent raise toward surface
+        this.params.waveAmplitude = 0.006; // near-calm; mild caustic cue that medium is water
+        this.params.waveFrequency = 0.28;
+        this.params.waveSpeed = 0.2;
+        this.params.interfaceRoughness = 0.014;
+        this.params.floorReflectance = 0.85;
+        this.params.atmosphereDensity = 0.22;
+        this.params.mediumThickness = 0.12;
+        this.params.sunElevation = 0.78;
+        this.params.sunAzimuth = 0.42;
+        this.params.sunIntensity = 1.85;
+        this.params.fillIntensity = 0.18;
+        this.params.fillTint = [1.0, 1.0, 0.98];
+        this.params.exposure = 1.4;
+        this.params.dispersion = 0.012;
+        this.params.maxBounces = 9;
         this.params.underwaterView = false;
-        this.lookAtCubeAbove();
-        this.cameraPos.set(0, 3.2, 2.8);
-        this.cameraTarget.set(0, this.params.cubeDepth, 0);
+        // Diagonal look-down over “rim” through surface at raised cube/bottom
+        this.cameraPos.set(0.95, 1.95, 3.85);
+        this.cameraTarget.set(0.0, this.params.cubeDepth + 0.45, -0.25);
+        this.params.fov = 50;
         break;
 
       case 'wave-contrast':
+        // §57: agitated sea — lit faces green, shadow opposite (not flat soup / cube hero)
+        // Same wave topology that reads in sun-glitter, but low *side* sun so faces
+        // show lit vs umbra + complement (not a glitter path). Cube parked off-stage.
         this.params.underwaterView = false;
-        this.params.sunElevation = 0.2;
-        this.params.waveAmplitude = 0.12;
-        waveMacrosTouched = true;
-        this.params.interfaceRoughness = 0.02;
-        this.params.complementStrength = 0.3;
-        this.cameraPos.set(0, 0.5, 5);
-        this.updateCameraTargetFromAngles(0, 0.1);
+        this.params.sunElevation = 0.16; // low raking → slope relief
+        this.params.sunAzimuth = 0.2; // ~+X cross-light vs camera look (−Z)
+        this.params.sunIntensity = 2.15;
+        this.params.fillIntensity = 0.12; // preserve face contrast
+        this.params.fillTint = [0.72, 0.88, 1.0];
+        this.params.waveAmplitude = 0.12; // WAVE_AMP_MAX — multi-octave readable slopes
+        this.params.waveFrequency = 0.72; // matches glitter topology that photographs well
+        this.params.interfaceRoughness = 0.01; // sharp microfacet → lit peaks
+        this.params.complementStrength = 0.58; // physiological opposite in umbra
+        this.params.exposure = 1.42;
+        this.params.volumeSigma = 0.025;
+        this.params.turbidity = 0.02;
+        this.params.atmosphereDensity = 0.34;
+        this.params.cubeDepth = -5.5; // not the subject
+        // Eye over open water looking out to horizon (glitter framing, not look-down soup)
+        this.cameraPos.set(0.05, 0.95, 4.8);
+        this.cameraTarget.set(0.0, 0.02, -4.5);
+        this.params.fov = 48;
         break;
 
       case 'twilight-ocean':
-        this.params.timeOfDay = 0.35;
-        this.params.complementStrength = 0.35;
-        this.applyTimeOfDay(0.35);
+        // §75: Harz sunset on ocean — red residual light; umbrae light sea-green / emerald
+        // Warm principal (low sun through vapour) + sea-green contrary fill on opposite faces;
+        // complement post pushes dark regions toward green (MIXED physiological).
+        // Goethe: shadows “in lightness… sea-green… beauty… emerald” — not black voids.
+        this.params.timeOfDay = 0.32; // sea-green-shadow phase of TOD ramp
+        this.applyTimeOfDay(0.32);
+        // Low warm sun — red residual on lit sides; stronger than pure TOD so contrast reads
+        this.params.sunElevation = 0.07;
+        this.params.sunAzimuth = 1.05; // raking from camera-right
+        this.params.sunIntensity = 1.9;
+        // Warm residual vapour (sunset red-orange) — haze light enough for dual-face read
+        this.params.atmosphereDensity = 0.38;
+        this.params.mediumThickness = 0.55;
+        this.params.mediumTint = [1.35, 0.62, 0.35];
+        this.params.turbidity = 0.12;
+        this.params.volumeSigma = 0.01;
+        // Sea-green contrary on opposite cube faces / soft umbrae
+        this.params.fillIntensity = 1.25;
+        this.params.fillDir = [-0.9, 0.35, -0.25]; // anti-sun
+        this.params.fillTint = [0.15, 0.98, 0.5]; // emerald / sea-green
+        this.params.complementStrength = 0.8;
+        this.params.exposure = 1.48;
         this.params.underwaterView = false;
-        this.cameraPos.set(0, 1.0, 5);
-        this.updateCameraTargetFromAngles(0, -0.15);
+        this.params.waveAmplitude = 0.04;
+        this.params.interfaceRoughness = 0.022;
+        this.params.cubeDepth = -1.4;
+        this.params.floorReflectance = 0.65;
+        // Low eye over ocean: cube mid-frame under warm residual sky
+        this.cameraPos.set(0.45, 0.95, 3.9);
+        this.cameraTarget.set(0.0, 0.0, -0.2);
+        this.params.fov = 53;
         break;
 
       case 'sun-glitter':
-        this.params.sunElevation = 0.05;
-        this.params.waveAmplitude = 0.1;
-        waveMacrosTouched = true;
-        this.params.bloomStrength = 0.4;
+        // §93: halo around the sun image on water — glitter path + bloom readable
+        // Sun ahead of camera (−Z) at grazing elev so specular trail runs toward the disk.
+        this.params.sunElevation = 0.055;
+        this.params.sunAzimuth = -1.48; // ~−Z, in look direction
+        this.params.sunIntensity = 2.55;
+        this.params.waveAmplitude = 0.12;
+        this.params.waveFrequency = 0.72;
+        this.params.bloomStrength = 0.9; // §93 subjective halo on sun image
+        this.params.exposure = 1.48;
+        this.params.interfaceRoughness = 0.01; // sharp microfacet peaks → glitter
         this.params.underwaterView = false;
-        this.cameraPos.set(0, 0.8, 6);
-        this.updateCameraTargetFromAngles(0, 0.05);
+        this.params.volumeSigma = 0.028;
+        this.params.turbidity = 0.02;
+        this.params.atmosphereDensity = 0.32; // less haze so path stays bright
+        this.params.fillIntensity = 0.18; // keep specular contrast
+        this.params.cubeDepth = -5.5; // park cube — not the subject
+        // Eye above water looking out along glitter path to sun
+        this.cameraPos.set(0.05, 1.05, 5.0);
+        this.cameraTarget.set(0.0, 0.02, -5.0);
+        this.params.fov = 46;
         break;
     }
+
+    this.applyRenderScale();
 
     if (updateHash) {
       window.location.hash = `chapter=${id}`;
@@ -761,6 +1149,77 @@ export class PathTracer {
     }
     this.syncWaveComponentsFromMacros();
     this.onChapterChanged?.(id, def.badge);
+    // Re-sync fly yaw/pitch + kill residual WASD velocity after camera teleport
+    this.onCameraMoved?.();
+    this.markSceneChanged();
+  }
+
+  /**
+   * Quick seafloor substrate bundles for the Seafloor panel preset buttons.
+   * Floor is substrate only — water colour comes from path physics.
+   */
+  applyFloorPreset(name: FloorPresetName): void {
+    this.params.floorEnabled = true;
+    this.params.floorMaterial = 0;
+    this.params.floorSpecular = 0.05;
+    this.params.floorRoughness = 0.55;
+    this.params.floorBumpFreq = 2.5;
+    this.params.floorBumpOctaves = 3;
+    this.params.floorCheckerScale = 0;
+    this.params.floorReflectance = 0.15;
+    this.params.floorAlbedoColor = [0.55, 0.48, 0.32];
+
+    switch (name) {
+      case 'abyss':
+        // Prefer disabled plane (or deep black) so mid-water scenes read without floor wash
+        this.params.floorEnabled = false;
+        this.params.floorHeight = -12;
+        this.params.floorPattern = 0;
+        this.params.floorAlbedoScale = 0.05;
+        this.params.floorBumpAmp = 0;
+        break;
+      case 'sand':
+        this.params.floorHeight = -3.5;
+        this.params.floorPattern = 2;
+        this.params.floorAlbedoColor = [0.62, 0.54, 0.38];
+        this.params.floorAlbedoScale = 0.55;
+        this.params.floorBumpAmp = 0.03;
+        break;
+      case 'gravel':
+        this.params.floorHeight = -3.5;
+        this.params.floorPattern = 1;
+        this.params.floorAlbedoColor = [0.55, 0.48, 0.32];
+        this.params.floorAlbedoScale = 0.4;
+        this.params.floorBumpAmp = 0.06;
+        break;
+      case 'white':
+        this.params.floorHeight = GOETHE_FLOOR_HEIGHT;
+        this.params.floorPattern = 0;
+        this.params.floorAlbedoColor = [1.0, 1.0, 1.0];
+        this.params.floorAlbedoScale = 0.9;
+        this.params.floorBumpAmp = 0;
+        this.params.floorReflectance = 0.95;
+        break;
+      case 'mirror':
+        this.params.floorHeight = -2.5;
+        this.params.floorPattern = 0;
+        this.params.floorAlbedoColor = [0.95, 0.95, 0.98];
+        this.params.floorAlbedoScale = 0.8;
+        this.params.floorBumpAmp = 0;
+        this.params.floorMaterial = 2;
+        this.params.floorSpecular = 1.0;
+        this.params.floorRoughness = 0.02;
+        this.params.floorReflectance = 0.9;
+        break;
+      case 'split':
+        this.params.floorHeight = GOETHE_FLOOR_HEIGHT;
+        this.params.floorPattern = 3;
+        this.params.floorAlbedoScale = 0.92;
+        this.params.floorBumpAmp = 0;
+        this.params.floorReflectance = 0.7;
+        break;
+    }
+
     this.markSceneChanged();
   }
 
@@ -1036,6 +1495,18 @@ export class PathTracer {
       complementStrength: { value: 0.0 },
       secondaryReflectWeight: { value: 0.0 },
       floorReflectance: { value: 0.15 },
+      floorHeight: { value: -3.5 },
+      floorEnabled: { value: 1.0 },
+      floorPattern: { value: 1 },
+      floorAlbedoColor: { value: new THREE.Vector3(0.55, 0.48, 0.32) },
+      floorAlbedoScale: { value: 0.4 },
+      floorBumpAmp: { value: 0.06 },
+      floorBumpFreq: { value: 2.5 },
+      floorBumpOctaves: { value: 3 },
+      floorRoughness: { value: 0.55 },
+      floorMaterial: { value: 0 },
+      floorSpecular: { value: 0.05 },
+      floorCheckerScale: { value: 0.0 },
       flameEdgeBoost: { value: 0.0 },
       moonDir: { value: new THREE.Vector3() },
       moonIntensity: { value: 0.0 },
@@ -1083,6 +1554,10 @@ export class PathTracer {
     this.lastCamTarget.copy(this.cameraTarget);
   }
 
+  /**
+   * Incremental mouse look. Prefer cameraControls updating shared yaw/pitch;
+   * this remains for API callers and always notifies onCameraMoved so fly state syncs.
+   */
   applyMouseLook(dx: number, dy: number): void {
     const sens = this.params.mouseSensitivity;
     const forward = new THREE.Vector3().subVectors(this.cameraTarget, this.cameraPos).normalize();
@@ -1090,6 +1565,8 @@ export class PathTracer {
     let pitch = Math.asin(THREE.MathUtils.clamp(forward.y, -0.99, 0.99)) - dy * sens;
     pitch = THREE.MathUtils.clamp(pitch, -1.45, 1.45);
     this.updateCameraTargetFromAngles(yaw, pitch);
+    // Critical: fly controller keeps its own yaw/pitch for WASD — must re-sync.
+    this.onCameraMoved?.();
   }
 
   updateCameraTargetFromAngles(yaw: number, pitch: number): void {
@@ -1103,6 +1580,7 @@ export class PathTracer {
     const d = this.params.cubeDepth;
     this.cameraPos.set(0, Math.min(-0.6, d + 1.2), 4.0);
     this.cameraTarget.set(0, d, 0);
+    this.onCameraMoved?.();
   }
 
   /** North-star above-water frame: look down through interface at submerged cube. */
@@ -1110,6 +1588,7 @@ export class PathTracer {
     const d = this.params.cubeDepth;
     this.cameraPos.set(0, 3.2, 5.0);
     this.cameraTarget.set(0, d, 0);
+    this.onCameraMoved?.();
   }
 
   setUnderwaterView(underwater: boolean): void {
@@ -1117,7 +1596,7 @@ export class PathTracer {
     this.params.underwaterView = underwater;
     if (underwater) this.lookAtCubeUnderwater();
     else this.lookAtCubeAbove();
-    this.onCameraMoved?.();
+    // lookAt* already calls onCameraMoved
     this.markSceneChanged();
   }
 
@@ -1250,6 +1729,18 @@ export class PathTracer {
     u.complementStrength.value = this.params.complementStrength;
     u.secondaryReflectWeight.value = this.params.secondaryReflectWeight;
     u.floorReflectance.value = this.params.floorReflectance;
+    u.floorHeight.value = this.params.floorHeight;
+    u.floorEnabled.value = this.params.floorEnabled ? 1.0 : 0.0;
+    u.floorPattern.value = this.params.floorPattern;
+    u.floorAlbedoColor.value.set(...this.params.floorAlbedoColor);
+    u.floorAlbedoScale.value = this.params.floorAlbedoScale;
+    u.floorBumpAmp.value = this.params.floorBumpAmp;
+    u.floorBumpFreq.value = this.params.floorBumpFreq;
+    u.floorBumpOctaves.value = this.params.floorBumpOctaves;
+    u.floorRoughness.value = this.params.floorRoughness;
+    u.floorMaterial.value = this.params.floorMaterial;
+    u.floorSpecular.value = this.params.floorSpecular;
+    u.floorCheckerScale.value = this.params.floorCheckerScale;
     u.flameEdgeBoost.value = this.params.flameEdgeBoost;
     u.moonDir.value.set(moonX, moonY, moonZ);
     u.moonIntensity.value = this.params.moonIntensity;

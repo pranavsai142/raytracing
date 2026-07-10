@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:30:50.952Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "shadows-underwater",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "shadows-underwater"
+  ],
+  "results": [
+    {
+      "chapterId": "shadows-underwater",
+      "section": "§78",
+      "quote": "Divers: red field, green shadows",
+      "goetheSaw": "Divers report a red-biased field with green-tending shadows under water.",
+      "userShouldSee": "Underwater dual-light: warm lit faces, cooler/greener shadow regions on cube/floor.",
+      "badgeExpected": "MIXED",
+      "badgeActual": "MIXED",
+      "badgeOk": true,
+      "caption": "§78 — Divers: red field, green shadows",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/05-shadows-underwater.png",
+      "captureOk": true,
+      "fileBase": "05-shadows-underwater",
+      "status": "PASS",
+      "notes": "",
+      "visualChecklist": "Underwater dual-light: warm lit faces, cooler/greener shadow regions on cube/floor.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

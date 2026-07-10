@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:25:46.547Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "refraction",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "refraction"
+  ],
+  "results": [
+    {
+      "chapterId": "refraction",
+      "section": "§227",
+      "quote": "Displacement at boundaries produces colour",
+      "goetheSaw": "At refracting boundaries, displacement of the image produces coloured fringes.",
+      "userShouldSee": "Spectral edges / dispersion at water boundaries and cube silhouette; PHYSICAL badge.",
+      "badgeExpected": "PHYSICAL",
+      "badgeActual": "PHYSICAL",
+      "badgeOk": true,
+      "caption": "§227 — Displacement at boundaries produces colour",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/07-refraction.png",
+      "captureOk": true,
+      "fileBase": "07-refraction",
+      "status": "PASS",
+      "notes": "",
+      "visualChecklist": "Spectral edges / dispersion at water boundaries and cube silhouette; PHYSICAL badge.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

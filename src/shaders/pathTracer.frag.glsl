@@ -53,6 +53,18 @@ uniform float opponentStrength;
 uniform float complementStrength;
 uniform float secondaryReflectWeight;
 uniform float floorReflectance;
+uniform float floorHeight;
+uniform float floorEnabled;
+uniform int floorPattern;
+uniform vec3 floorAlbedoColor;
+uniform float floorAlbedoScale;
+uniform float floorBumpAmp;
+uniform float floorBumpFreq;
+uniform int floorBumpOctaves;
+uniform float floorRoughness;
+uniform int floorMaterial;
+uniform float floorSpecular;
+uniform float floorCheckerScale;
 uniform float flameEdgeBoost;
 uniform vec3 moonDir;
 uniform float moonIntensity;
@@ -158,21 +170,111 @@ struct HitInfo {
   int material;
 };
 
-// Iterative waved-surface intersection (topology matters for TIR escape)
+// Geometric medium test: below the heightfield ⇒ water.
+// waveNormal points toward air ( +Y hemisphere ).
+bool isInWaterAt(vec3 p) {
+  return p.y < waveHeight(p.xz, time);
+}
+
+// Heightfield surface: f(t) = (ro+rd*t).y - H((ro+rd*t).xz) = 0.
+// 1) Sign-change march + bisection (robust for multi-crest).
+// 2) Newton projection fallback (guarantees a root when origin is below/above
+//    and the ray aims at the surface — kills false misses → black samples).
 bool intersectWaterSurface(vec3 ro, vec3 rd, out float t, out vec3 hitN, out vec2 hitXZ) {
+  const float ampBound = 0.28; // ≥ WAVE_TOTAL_AMP_BUDGET + margin
+  const float tMin = 1e-3;
+  const float tMax = 200.0;
+  t = -1.0;
+  hitXZ = ro.xz;
+  hitN = vec3(0.0, 1.0, 0.0);
+
+  float tLo;
+  float tHi;
+  if (abs(rd.y) < 1e-5) {
+    // Near-horizontal: march a long segment; surface may still be crossed via slope
+    tLo = tMin;
+    tHi = min(tMax, 100.0);
+  } else {
+    // Expand slab so deep underwater cameras still bracket y≈0 surface
+    float yLo = min(-ampBound, ro.y - 0.5);
+    float yHi = max(ampBound, ro.y + 0.5);
+    // Always include mean-surface band
+    yLo = min(yLo, -ampBound);
+    yHi = max(yHi, ampBound);
+    float ta = (yLo - ro.y) / rd.y;
+    float tb = (yHi - ro.y) / rd.y;
+    tLo = max(tMin, min(ta, tb));
+    tHi = min(tMax, max(ta, tb));
+    if (tLo > tHi) {
+      // Ray points away from the vertical slab — still try Newton from plane seed
+      tLo = tMin;
+      tHi = tMax;
+    }
+  }
+
+  const int STEPS = 64;
+  float dt = (tHi - tLo) / float(STEPS);
+  float tPrev = tLo;
+  float fPrev = (ro.y + rd.y * tPrev) - waveHeight((ro + rd * tPrev).xz, time);
+
+  for (int i = 1; i <= STEPS; i++) {
+    float tCurr = (i == STEPS) ? tHi : (tLo + float(i) * dt);
+    float fCurr = (ro.y + rd.y * tCurr) - waveHeight((ro + rd * tCurr).xz, time);
+
+    if (fPrev * fCurr <= 0.0 && (abs(fPrev) + abs(fCurr)) > 1e-8) {
+      float a = tPrev;
+      float b = tCurr;
+      float fa = fPrev;
+      for (int j = 0; j < 20; j++) {
+        float m = 0.5 * (a + b);
+        float fm = (ro.y + rd.y * m) - waveHeight((ro + rd * m).xz, time);
+        if (fa * fm <= 0.0) {
+          b = m;
+        } else {
+          a = m;
+          fa = fm;
+        }
+      }
+      t = 0.5 * (a + b);
+      if (t >= tMin && t <= tMax) {
+        hitXZ = (ro + rd * t).xz;
+        hitN = waveNormal(hitXZ, time);
+        return true;
+      }
+    }
+    tPrev = tCurr;
+    fPrev = fCurr;
+  }
+
+  // Newton fallback: classic Oceanscape projection (always returns a candidate).
+  // Accept only when residual is small — avoids inventing hits behind the ray.
+  if (abs(rd.y) < 1e-5) return false;
   t = (-ro.y) / rd.y;
-  if (t < 0.001 || t > 200.0) return false;
-  for (int i = 0; i < 4; i++) {
+  if (t < tMin || t > tMax) return false;
+  for (int i = 0; i < 8; i++) {
     vec3 p = ro + rd * t;
     hitXZ = p.xz;
     float h = waveHeight(hitXZ, time);
-    t = (h - ro.y) / rd.y;
-    if (t < 0.001) return false;
+    vec2 dH = waveDeriv(hitXZ, time);
+    float f = p.y - h;
+    float dfdt = rd.y - (dH.x * rd.x + dH.y * rd.z);
+    if (abs(dfdt) < 1e-6) break;
+    float tNew = t - f / dfdt;
+    if (tNew < tMin || tNew > tMax) break;
+    if (abs(tNew - t) < 1e-4) {
+      t = tNew;
+      break;
+    }
+    t = tNew;
   }
-  vec3 p = ro + rd * t;
-  hitXZ = p.xz;
-  hitN = waveNormal(hitXZ, time);
-  return true;
+  hitXZ = (ro + rd * t).xz;
+  float hN = waveHeight(hitXZ, time);
+  float resid = abs((ro.y + rd.y * t) - hN);
+  if (t >= tMin && t <= tMax && resid < 0.06) {
+    hitN = waveNormal(hitXZ, time);
+    return true;
+  }
+  return false;
 }
 
 float intersectBox(vec3 ro, vec3 rd, vec3 boxMin, vec3 boxMax, out vec3 outN) {
@@ -196,23 +298,32 @@ float intersectBox(vec3 ro, vec3 rd, vec3 boxMin, vec3 boxMax, out vec3 outN) {
   return t;
 }
 
+// Finite vertical cylinder (Y-axis) — stick for §76 dual coloured shadows.
+// Prior sphere math ignored the Y extent and produced only a pinhead occluder.
 float intersectRod(vec3 ro, vec3 rd) {
   if (sceneMode < 3) return -1.0;
-  vec3 rodC = vec3(0.5, -4.8, 0.0);
-  float r = 0.03;
-  vec3 oc = ro - rodC;
-  float b = dot(oc, rd);
+  vec2 rodXZ = vec2(0.5, 0.0);
+  float r = 0.09;
+  float rodTop = floorHeight + 2.0;
+  vec2 oc = ro.xz - rodXZ;
+  vec2 d = rd.xz;
+  float a = dot(d, d);
+  float b = dot(oc, d);
   float c = dot(oc, oc) - r * r;
-  float disc = b * b - c;
-  if (disc < 0.0) return -1.0;
+  float disc = b * b - a * c;
+  if (disc < 0.0 || a < 1e-12) return -1.0;
   float s = sqrt(disc);
-  float t0 = -b - s;
-  float t1 = -b + s;
-  float t = t0 > 0.001 ? t0 : t1;
-  if (t < 0.001 || t > 200.0) return -1.0;
-  vec3 p = ro + rd * t;
-  if (p.y < -5.8 || p.y > -3.8) return -1.0;
-  return t;
+  float invA = 1.0 / a;
+  float t0 = (-b - s) * invA;
+  float t1 = (-b + s) * invA;
+  float tHit = 1e20;
+  for (int k = 0; k < 2; k++) {
+    float t = (k == 0) ? t0 : t1;
+    if (t < 0.001 || t > 200.0) continue;
+    float y = ro.y + rd.y * t;
+    if (y >= floorHeight && y <= rodTop) tHit = min(tHit, t);
+  }
+  return tHit < 1e19 ? tHit : -1.0;
 }
 
 float intersectGreyPlane(vec3 ro, vec3 rd) {
@@ -224,35 +335,163 @@ float intersectGreyPlane(vec3 ro, vec3 rd) {
   return t;
 }
 
-float intersectFloor(vec3 ro, vec3 rd) {
-  if (rd.y >= -0.001) return -1.0;
-  float t = (-5.8 - ro.y) / rd.y;
-  return (t > 0.001 && t < 200.0) ? t : -1.0;
+// --- Seafloor heightfield (bump noise) + albedo patterns ---
+float floorValueNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
-vec3 floorAlbedo(vec3 p) {
-  if (sceneMode == 4) {
-    return p.x < 0.0 ? vec3(0.9, 0.85, 0.1) : vec3(0.92);
+float floorHeightField(vec2 xz) {
+  if (floorBumpAmp < 1e-5) return floorHeight;
+  float h = 0.0;
+  float amp = 1.0;
+  float freq = max(floorBumpFreq, 0.05);
+  float sumAmp = 0.0;
+  int octs = clamp(floorBumpOctaves, 1, 4);
+  for (int o = 0; o < 4; o++) {
+    if (o >= octs) break;
+    h += amp * (floorValueNoise(xz * freq) * 2.0 - 1.0);
+    sumAmp += amp;
+    amp *= 0.5;
+    freq *= 2.1;
   }
-  if (sceneMode >= 3) return vec3(0.9);
-  return vec3(0.05, 0.08, 0.12);
+  if (sumAmp > 1e-5) h /= sumAmp;
+  return floorHeight + floorBumpAmp * h;
+}
+
+vec2 floorHeightDeriv(vec2 xz) {
+  float e = 0.025;
+  float hx0 = floorHeightField(xz - vec2(e, 0.0));
+  float hx1 = floorHeightField(xz + vec2(e, 0.0));
+  float hz0 = floorHeightField(xz - vec2(0.0, e));
+  float hz1 = floorHeightField(xz + vec2(0.0, e));
+  return vec2((hx1 - hx0) / (2.0 * e), (hz1 - hz0) / (2.0 * e));
+}
+
+vec3 floorNormalAt(vec2 xz) {
+  vec2 dH = floorHeightDeriv(xz);
+  return normalize(vec3(-dH.x, 1.0, -dH.y));
+}
+
+// Plane seed + optional low-amp Newton; residual fail → plane fallback.
+float intersectFloor(vec3 ro, vec3 rd, out vec3 outN) {
+  outN = vec3(0.0, 1.0, 0.0);
+  if (floorEnabled < 0.5) return -1.0;
+  if (rd.y >= -0.001) return -1.0;
+
+  float tPlane = (floorHeight - ro.y) / rd.y;
+  if (tPlane < 0.001 || tPlane > 200.0) return -1.0;
+
+  if (floorBumpAmp < 1e-5) {
+    return tPlane;
+  }
+
+  float ampBound = max(floorBumpAmp * 1.25, 0.02);
+  float t0 = (floorHeight - ampBound - ro.y) / rd.y;
+  float t1 = (floorHeight + ampBound - ro.y) / rd.y;
+  float tLo = max(min(t0, t1), 0.001);
+  float tHi = min(max(t0, t1), 200.0);
+  if (tLo > tHi) return tPlane;
+
+  float t = clamp(tPlane, tLo, tHi);
+  for (int i = 0; i < 4; i++) {
+    vec3 p = ro + rd * t;
+    float h = floorHeightField(p.xz);
+    float f = p.y - h;
+    if (abs(f) < 1e-4) break;
+    vec2 dH = floorHeightDeriv(p.xz);
+    float dfdt = rd.y - (dH.x * rd.x + dH.y * rd.z);
+    if (abs(dfdt) < 1e-6) break;
+    float tNew = clamp(t - f / dfdt, tLo, tHi);
+    if (abs(tNew - t) < 1e-5) {
+      t = tNew;
+      break;
+    }
+    t = tNew;
+  }
+
+  vec3 pHit = ro + rd * t;
+  float residual = abs(pHit.y - floorHeightField(pHit.xz));
+  if (t < 0.001 || t > 200.0 || residual > max(0.08, floorBumpAmp * 2.5)) {
+    outN = vec3(0.0, 1.0, 0.0);
+    return tPlane;
+  }
+  outN = floorNormalAt(pHit.xz);
+  return t;
+}
+
+// Parametric albedo: pattern + color*scale (sceneMode no longer drives floor paint).
+vec3 floorAlbedo(vec3 p) {
+  vec3 base = floorAlbedoColor * floorAlbedoScale;
+
+  // 3 = split yellow|white (Goethe §56 contrast)
+  if (floorPattern == 3) {
+    float s = max(floorAlbedoScale, 0.01);
+    return p.x < 0.0 ? vec3(0.9, 0.85, 0.1) * s : vec3(0.92) * s;
+  }
+
+  // 4 = checker
+  if (floorPattern == 4) {
+    float sc = max(floorCheckerScale, 0.5);
+    float checker = mod(floor(p.x * sc) + floor(p.z * sc), 2.0);
+    return mix(base * 0.35, base, checker);
+  }
+
+  // 1 = gravel multi-scale noise
+  if (floorPattern == 1) {
+    float f = max(floorBumpFreq, 0.5);
+    float n1 = floorValueNoise(p.xz * f * 1.7);
+    float n2 = floorValueNoise(p.xz * f * 4.3 + 17.0);
+    float n3 = floorValueNoise(p.xz * f * 9.1 + 41.0);
+    float gravel = 0.72 + 0.22 * n1 + 0.12 * (n2 - 0.5) + 0.06 * (n3 - 0.5);
+    vec3 rock = mix(base, base * vec3(0.82, 0.86, 0.92), n2 * 0.45);
+    return rock * gravel;
+  }
+
+  // 2 = sand finer smoother grain
+  if (floorPattern == 2) {
+    float f = max(floorBumpFreq, 0.5);
+    float n1 = floorValueNoise(p.xz * f * 3.0);
+    float n2 = floorValueNoise(p.xz * f * 8.0 + 3.0);
+    float sand = 0.9 + 0.08 * n1 + 0.04 * n2;
+    return base * sand;
+  }
+
+  // 0 = uniform
+  return base;
 }
 
 bool shadowedByRod(vec3 p, vec3 lightDir) {
   if (sceneMode < 3) return false;
-  vec3 rodC = vec3(0.5, -4.8, 0.0);
-  float r = 0.03;
-  vec3 oc = p - rodC;
-  float b = dot(oc, lightDir);
+  vec2 rodXZ = vec2(0.5, 0.0);
+  float r = 0.09;
+  float rodTop = floorHeight + 2.0;
+  vec2 oc = p.xz - rodXZ;
+  vec2 d = lightDir.xz;
+  float a = dot(d, d);
+  float b = dot(oc, d);
   float c = dot(oc, oc) - r * r;
-  float disc = b * b - c;
+  // Near-vertical light: umbra is the rod's footprint on the floor
+  if (a < 1e-8) return c < 0.0;
+  float disc = b * b - a * c;
   if (disc < 0.0) return false;
   float s = sqrt(disc);
-  float t = -b - s;
-  if (t < 0.001) t = -b + s;
-  if (t < 0.001) return false;
-  vec3 hit = p + lightDir * t;
-  return hit.y >= -5.8 && hit.y <= -3.8;
+  float invA = 1.0 / a;
+  float t0 = (-b - s) * invA;
+  float t1 = (-b + s) * invA;
+  for (int k = 0; k < 2; k++) {
+    float t = (k == 0) ? t0 : t1;
+    if (t < 0.001) continue;
+    float y = p.y + lightDir.y * t;
+    if (y >= floorHeight && y <= rodTop) return true;
+  }
+  return false;
 }
 
 vec3 rotateCube(vec3 p) {
@@ -289,13 +528,14 @@ HitInfo traceScene(Ray r) {
     cubeN = rotateCube(cubeN);
   }
 
-  float tFloor = intersectFloor(r.origin, r.direction);
+  vec3 floorN;
+  float tFloor = intersectFloor(r.origin, r.direction, floorN);
   float tRod = intersectRod(r.origin, r.direction);
   float tGrey = intersectGreyPlane(r.origin, r.direction);
 
   float tMin = 1e20;
   int mat = -1;
-  if (planeHit && tPlane < tMin) { tMin = tPlane; mat = 0; }
+  if (planeHit && tPlane > 0.001 && tPlane < tMin) { tMin = tPlane; mat = 0; }
   if (tCube > 0.0 && tCube < tMin) { tMin = tCube; mat = 1; }
   if (tFloor > 0.0 && tFloor < tMin) { tMin = tFloor; mat = 2; }
   if (tRod > 0.0 && tRod < tMin) { tMin = tRod; mat = 3; }
@@ -306,8 +546,12 @@ HitInfo traceScene(Ray r) {
     info.dist = tMin;
     info.point = r.origin + r.direction * tMin;
     info.material = mat;
-    if (mat == 0) info.normal = planeN;
-    else if (mat == 1) info.normal = cubeN;
+    if (mat == 0) {
+      // Exact heightfield point (intersection t is approximate on xz)
+      info.point = vec3(info.point.x, waveHeight(info.point.xz, time), info.point.z);
+      info.normal = planeN;
+    } else if (mat == 1) info.normal = cubeN;
+    else if (mat == 2) info.normal = floorN;
     else info.normal = vec3(0.0, 1.0, 0.0);
   }
   return info;
@@ -386,6 +630,12 @@ vec3 envLight(vec3 dir, float lambdaNm) {
   return (sky + vec3(3.5, 3.2, 2.8) * sun + vec3(2.8, 2.6, 2.2) * moon) * spectrumWeight(lambdaNm);
 }
 
+// Residual in-scatter if a path truly cannot hit surface/floor (should be rare
+// after domain closure). Never sample air sky here — medium leak / white bar.
+vec3 underwaterMissRadiance(vec3 dir, float lambdaNm) {
+  return scatterTint * volumeTint * spectrumWeight(lambdaNm) * 0.04;
+}
+
 vec3 cubeTexture(vec3 localP, vec3 localN) {
   vec2 uv;
   if (abs(localN.x) > 0.5) uv = localP.yz * 0.5 + 0.5;
@@ -449,7 +699,8 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
   vec3 throughput = vec3(1.0);
   Ray ray = primary;
   float ior = iorAtWavelength(lambdaNm, waterIOR, dispersion);
-  bool inWater = cameraPos.y < 0.0; // start medium from camera position
+  // Medium from heightfield, not flat y=0 (waves displace the interface)
+  bool inWater = isInWaterAt(primary.origin);
 
   int maxB = int(maxBounces + 0.5);
   for (int bounce = 0; bounce < 12; bounce++) {
@@ -457,8 +708,48 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
     HitInfo hit = traceScene(ray);
     vec2 ru = rand2(seed + float(bounce) * 17.0);
 
+    // —— Domain closure (production): infinite ocean = surface + optional floor.
+    // Underwater rays that "miss" are almost always a false miss (intersection
+    // failure or near-horizontal path). Those used to terminate with near-black
+    // residual → speckles / black spots that pop each sample in LIVE/early STILL.
+    // Close the domain instead of inventing sky underwater.
+    if (!hit.hit && inWater) {
+      if (ray.direction.y > 1e-4) {
+        // Going up: must meet the free surface
+        float tS;
+        vec3 nS;
+        vec2 xzS;
+        if (intersectWaterSurface(ray.origin, ray.direction, tS, nS, xzS) && tS > 0.001) {
+          hit.hit = true;
+          hit.dist = tS;
+          hit.point = vec3(xzS.x, waveHeight(xzS, time), xzS.y);
+          hit.normal = nS;
+          hit.material = 0;
+        }
+      } else if (floorEnabled > 0.5 && ray.direction.y < -1e-4) {
+        // Going down: must meet the seafloor plane
+        float tF = (floorHeight - ray.origin.y) / ray.direction.y;
+        if (tF > 0.001 && tF < 200.0) {
+          hit.hit = true;
+          hit.dist = tF;
+          hit.point = ray.origin + ray.direction * tF;
+          hit.normal = vec3(0.0, 1.0, 0.0);
+          hit.material = 2;
+        }
+      }
+    }
+
+    // Travel segment through water: Beer attenuation (physical path length)
+    if (inWater && hit.hit) {
+      throughput *= volumeAttenuation(hit.dist, lambdaNm);
+    } else if (inWater && !hit.hit) {
+      // Near-horizontal residual only (should be uncommon after closure)
+      throughput *= volumeAttenuation(12.0, lambdaNm);
+    }
+
     if (!hit.hit) {
-      accum += throughput * envLight(ray.direction, lambdaNm);
+      if (inWater) accum += throughput * underwaterMissRadiance(ray.direction, lambdaNm);
+      else accum += throughput * envLight(ray.direction, lambdaNm);
       break;
     }
 
@@ -484,11 +775,12 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
       vec3 localP = rotateCubeInv(hit.point - cubeCenter);
       vec3 localN = normalize(rotateCubeInv(N));
       vec3 worldN = normalize(N);
+      // Path atten already applied for this leg; residual single-scatter glow
       if (inWater) {
-        vec3 att = volumeAttenuation(hit.dist, lambdaNm);
         vec3 godBeam = scatterTint * spectrumWeight(lambdaNm) * volumeTint;
-        accum += throughput * godBeam * (vec3(1.0) - att) * 0.08;
-        throughput *= att;
+        float pathTau = volumeSigma + turbidity * 0.12;
+        float glow = 1.0 - exp(-pathTau * hit.dist);
+        accum += throughput * godBeam * glow * 0.06;
       }
       vec3 albedo = cubeTexture(localP, localN);
       vec3 sunL = normalize(sunDir);
@@ -542,56 +834,91 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
     }
 
     if (hit.material == 2) {
+      // Path atten already applied for this leg; residual single-scatter glow
+      if (inWater) {
+        vec3 godBeam = scatterTint * spectrumWeight(lambdaNm) * volumeTint;
+        float pathTau = volumeSigma + turbidity * 0.12;
+        float glow = 1.0 - exp(-pathTau * hit.dist);
+        accum += throughput * godBeam * glow * 0.06;
+      }
+
+      // Mirror: reflect and continue path (do not terminate with a white shade)
+      if (floorMaterial == 2) {
+        vec3 Nn = N;
+        if (dot(Nn, -I) < 0.0) Nn = -Nn;
+        vec3 reflDir = normalize(I - 2.0 * dot(I, Nn) * Nn);
+        float cosR = max(dot(-I, Nn), 0.0);
+        float fres = mix(max(floorSpecular, 0.6), 1.0, pow(1.0 - cosR, 5.0));
+        vec3 mAlb = floorAlbedo(hit.point);
+        throughput *= mix(vec3(max(floorReflectance, 0.55)), mAlb, 0.12) * fres;
+        ray.origin = hit.point + Nn * 0.003;
+        ray.direction = reflDir;
+        continue;
+      }
+
       vec3 alb = floorAlbedo(hit.point);
       vec3 sunL = normalize(sunDir);
       vec3 fillL = normalize(fillDir);
       bool sunSh = shadowedByRod(hit.point, sunL);
       bool fillSh = shadowedByRod(hit.point, fillL);
       vec3 lit = vec3(0.0);
-      if (!sunSh) lit += alb * sunIntensity * vec3(1.1, 1.0, 0.85) * max(dot(N, sunL), 0.0);
-      if (!fillSh) lit += alb * fillIntensity * fillTint * max(dot(N, fillL), 0.0);
+      float nSun = max(dot(N, sunL), 0.0);
+      float nFill = max(dot(N, fillL), 0.0);
+      if (!sunSh) lit += alb * sunIntensity * vec3(1.1, 1.0, 0.85) * nSun;
+      if (!fillSh) lit += alb * fillIntensity * fillTint * nFill;
       if (sunSh && fillSh) lit = alb * 0.02;
+
+      // Glossy: Blinn-Phong specular on top of diffuse (roughness → shininess)
+      if (floorMaterial == 1) {
+        vec3 V = normalize(-I);
+        float rough = clamp(floorRoughness, 0.04, 1.0);
+        float shininess = mix(256.0, 4.0, rough);
+        if (!sunSh) {
+          vec3 H = normalize(sunL + V);
+          float spec = pow(max(dot(N, H), 0.0), shininess);
+          lit += floorSpecular * sunIntensity * vec3(1.1, 1.0, 0.85) * spec;
+        }
+        if (!fillSh) {
+          vec3 Hf = normalize(fillL + V);
+          float specF = pow(max(dot(N, Hf), 0.0), shininess * 0.5);
+          lit += floorSpecular * 0.45 * fillIntensity * fillTint * specF;
+        }
+      }
+
       accum += throughput * lit * spectrumWeight(lambdaNm);
       break;
     }
 
-    // --- Water interface: exact dielectric port from Oceanscape Metal ---
-    // Side/eta: internal (water->air) when dot(I,N)>0; external (air->water) otherwise
-    float eta;
-    vec3 N_eff = N;
-    if (dot(I, N) > 0.0) {
-      N_eff = -N;
-      eta = ior; // water -> air
-    } else {
-      eta = 1.0 / ior; // air -> water
-    }
+    // --- Water interface: Fresnel / Snell / TIR on geometric heightfield normal ---
+    // waveNormal points toward air. fromInside = ray in water (approaching from -N).
+    bool fromInside = dot(I, N) > 0.0;
+    vec3 N_eff = fromInside ? -N : N;
+    float eta = fromInside ? ior : (1.0 / ior); // incident IOR / transmitted IOR for refractDir
 
-    float criticalAngle = asin(1.0 / ior);
     float cosTheta = max(dot(N_eff, -I), 0.0);
     float reflectance = schlickFresnel(cosTheta, eta);
     vec3 T = refractDir(I, N_eff, eta);
-    float theta_i = acos(clamp(cosTheta, 0.0, 1.0));
-    bool tir = false;
-    if (eta > 1.0 && theta_i > criticalAngle) tir = true;
-    if (tir || length(T) < 0.001) {
-      reflectance = 1.0;
-      tir = true;
-    }
+    bool tir = (eta > 1.0) && (length(T) < 1e-6);
+    if (tir) reflectance = 1.0;
 
+    // Microfacet for rough interface (same N_eff for both reflect and refract — no ad-hoc spread)
     vec3 N_micro = sampleMicrofacet(N_eff, interfaceRoughness, ru);
+    // Keep microfacet on same hemisphere as geometric N_eff
+    if (dot(N_micro, N_eff) < 0.0) N_micro = -N_micro;
 
-    // Stochastic Fresnel: TIR always reflects (trapped), escape only when angle < critical
     bool chooseReflect = tir || (ru.x < reflectance);
     vec3 nextDir;
 
-    bool fromInside = dot(I, N) > 0.0;
-
     if (chooseReflect) {
       nextDir = normalize(I - 2.0 * dot(I, N_micro) * N_micro);
+      // Reflect must leave into the incident medium hemisphere
+      if (dot(nextDir, N_eff) < 0.0) {
+        nextDir = normalize(I - 2.0 * dot(I, N_eff) * N_eff);
+      }
       if (!fromInside && secondaryReflectWeight > 0.001) {
-        vec3 reflDir = normalize(nextDir);
+        vec3 reflDir = nextDir;
         if (reflDir.y < -0.05) {
-          float tFl = (-5.8 - hit.point.y) / reflDir.y;
+          float tFl = (floorHeight - hit.point.y) / reflDir.y;
           if (tFl > 0.001 && tFl < 30.0) {
             accum += throughput * floorReflectance * secondaryReflectWeight * vec3(0.08, 0.1, 0.14);
           }
@@ -599,35 +926,56 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
       }
     } else {
       nextDir = normalize(refractDir(I, N_micro, eta));
-      if (interfaceRoughness > 0.001) {
-        vec3 spreadAxis = normalize(cross(nextDir, vec3(0.3, 0.7, 0.4)));
-        nextDir = normalize(nextDir + spreadAxis * interfaceRoughness * 0.15 * (ru.y - 0.5));
-      }
-      inWater = !fromInside; // crossed the interface
-    }
-
-    // Volume scatter along underwater propagation legs (god rays + redirect back to surface)
-    if (inWater) {
-      Ray volRay;
-      float legLen = 3.0;
-      if (volumeScatterLeg(ray, legLen, lambdaNm, seed, bounce, throughput, accum, volRay)) {
-        ray = volRay;
-        continue;
+      if (length(nextDir) < 1e-6) {
+        // Microfacet TIR fallback → geometric reflect
+        nextDir = normalize(I - 2.0 * dot(I, N_eff) * N_eff);
+        chooseReflect = true;
       }
     }
 
-    // Spawn at wave-adjusted surface position (topology affects next intersection)
-    vec2 hitXZ = hit.point.xz;
-    float h = waveHeight(hitXZ, time);
-    vec3 spawnPos = vec3(hit.point.x, h, hit.point.z) + nextDir * 0.002;
+    // Medium after event: reflect stays, transmit flips
+    if (!chooseReflect) inWater = !fromInside;
+
+    // Dielectric spawn: offset along geometric normal into the medium we enter.
+    // waveNormal points to air (+). Snap so heightfield side matches intent
+    // (tilted N + eps can land in a trough/air pocket → medium desync → black path).
+    bool enterAir = chooseReflect ? !fromInside : fromInside;
+    float eps = 0.003;
+    vec3 spawnPos = hit.point + N * (enterAir ? eps : -eps);
+    for (int k = 0; k < 5; k++) {
+      bool below = isInWaterAt(spawnPos);
+      if (enterAir && !below) break;
+      if (!enterAir && below) break;
+      spawnPos += N * (enterAir ? eps : -eps);
+    }
+    // Prefer geometric side of the free surface after snap
+    inWater = isInWaterAt(spawnPos);
+    if (enterAir && inWater) {
+      spawnPos += N * (eps * 3.0);
+      inWater = false;
+    } else if (!enterAir && !inWater) {
+      spawnPos -= N * (eps * 3.0);
+      inWater = true;
+    }
 
     ray.origin = spawnPos;
     ray.direction = nextDir;
 
-    // Russian roulette after a few bounces (deeper trapped paths)
-    if (bounce >= 3) {
+    // Optional single-scatter in water along the *outgoing* ray (not the old incident ray)
+    if (inWater) {
+      Ray volRay;
+      float legLen = 4.0;
+      if (volumeScatterLeg(ray, legLen, lambdaNm, seed, bounce, throughput, accum, volRay)) {
+        ray = volRay;
+        inWater = isInWaterAt(ray.origin);
+      }
+    }
+
+    // Russian roulette after a few bounces — keep q floor higher so we don't
+    // kill barely-alive underwater paths into pure black samples as often.
+    if (bounce >= 4) {
       float lum = max(throughput.r, max(throughput.g, throughput.b));
-      float q = clamp(lum, 0.05, 0.95);
+      float q = clamp(lum, 0.15, 0.95);
       if (hash3(vec3(seed, float(bounce + 99))) > q) break;
       throughput /= q;
     }
@@ -714,7 +1062,12 @@ void main() {
     Ray primary;
     primary.origin = cameraPos;
     primary.direction = rd;
-    color += pathTrace(primary, pixel + jitter + float(s), lambdaNm);
+    vec3 sampleCol = pathTrace(primary, pixel + jitter + float(s), lambdaNm);
+    // Soft firefly clamp (production path tracers): kill rare huge spikes that
+    // make neighboring near-black samples look like "popping" holes in LIVE.
+    float peak = max(sampleCol.r, max(sampleCol.g, sampleCol.b));
+    if (peak > 8.0) sampleCol *= 8.0 / peak;
+    color += sampleCol;
   }
   color /= max(float(spp), 1.0);
 

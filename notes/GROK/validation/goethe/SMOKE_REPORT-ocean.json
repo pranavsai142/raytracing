@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:17:46.197Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "ocean",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "ocean"
+  ],
+  "results": [
+    {
+      "chapterId": "ocean",
+      "section": "—",
+      "quote": "Dielectric interface path tracer",
+      "goetheSaw": "North-star dielectric ocean: Fresnel, Snell window, TIR trap/escape, and spectral caustics at the air–water interface (not a Goethe paragraph — physics baseline).",
+      "userShouldSee": "Submerged checkerboard cube; realistic interface; Snell/TIR/cube framing; no fake bulk pigment.",
+      "badgeExpected": "PHYSICAL",
+      "badgeActual": "PHYSICAL",
+      "badgeOk": true,
+      "caption": "— — Dielectric interface path tracer",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/01-ocean.png",
+      "captureOk": true,
+      "fileBase": "01-ocean",
+      "status": "PASS",
+      "notes": "Physics north-star; visual Goethe match N/A — structural + dielectric proof.",
+      "visualChecklist": "Submerged checkerboard cube; realistic interface; Snell/TIR/cube framing; no fake bulk pigment.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

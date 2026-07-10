@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:17:31.918Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "primordial",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "primordial"
+  ],
+  "results": [
+    {
+      "chapterId": "primordial",
+      "section": "§175",
+      "quote": "Light, darkness, and a colourless medium",
+      "goetheSaw": "Light + darkness + a colourless semi-transparent medium produce colour; thickness of the medium modulates the appearance.",
+      "userShouldSee": "Low sun through medium: warm near horizon / cool overhead relations; thickness changes colour; bulk water not blue paint at low opacity.",
+      "badgeExpected": "PHYSICAL",
+      "badgeActual": "PHYSICAL",
+      "badgeOk": true,
+      "caption": "§175 — Light, darkness, and a colourless medium",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/02-primordial.png",
+      "captureOk": true,
+      "fileBase": "02-primordial",
+      "status": "PASS",
+      "notes": "",
+      "visualChecklist": "Low sun through medium: warm near horizon / cool overhead relations; thickness changes colour; bulk water not blue paint at low opacity.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

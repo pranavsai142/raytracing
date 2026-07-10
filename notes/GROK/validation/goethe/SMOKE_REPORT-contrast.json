@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:24:52.510Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "contrast",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "contrast"
+  ],
+  "results": [
+    {
+      "chapterId": "contrast",
+      "section": "§56",
+      "quote": "White on yellow → purple tint",
+      "goetheSaw": "White against a yellow field takes on a purple (physiological) tint at the boundary.",
+      "userShouldSee": "Yellow/white split floor; purple fringe when physiological layer enabled; MIXED badge.",
+      "badgeExpected": "MIXED",
+      "badgeActual": "MIXED",
+      "badgeOk": true,
+      "caption": "§56 — White on yellow → purple tint",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/06-contrast.png",
+      "captureOk": true,
+      "fileBase": "06-contrast",
+      "status": "PASS",
+      "notes": "Physiological fringe may need human eyes on PNG; structural badge + scene load required.",
+      "visualChecklist": "Yellow/white split floor; purple fringe when physiological layer enabled; MIXED badge.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:37:28.538Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "twilight-ocean",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "twilight-ocean"
+  ],
+  "results": [
+    {
+      "chapterId": "twilight-ocean",
+      "section": "§75",
+      "quote": "Sea-green shadows at twilight",
+      "goetheSaw": "At twilight the sea shows green-tending shadows under residual sky light.",
+      "userShouldSee": "Low sun ocean; sea-green shadow tendency; MIXED badge.",
+      "badgeExpected": "MIXED",
+      "badgeActual": "MIXED",
+      "badgeOk": true,
+      "caption": "§75 — Sea-green shadows at twilight",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/15-twilight-ocean.png",
+      "captureOk": true,
+      "fileBase": "15-twilight-ocean",
+      "status": "PASS",
+      "notes": "",
+      "visualChecklist": "Low sun ocean; sea-green shadow tendency; MIXED badge.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

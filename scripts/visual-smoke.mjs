@@ -101,6 +101,12 @@ const SCENES = [
 
 async function waitForApi(page, timeoutMs = 15000) {
   await page.waitForFunction(() => window.__oceanscape?.ready === true, null, { timeout: timeoutMs });
+  // Dismiss production intro so free-fly / freeze APIs are unblocked
+  await page.evaluate(() => {
+    if (window.__oceanscape && !window.__oceanscape.entered) {
+      window.__oceanscape.enterOceanscape();
+    }
+  });
 }
 
 async function captureScene(page, scene) {

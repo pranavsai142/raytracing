@@ -12,8 +12,15 @@
  * Env:
  *   BASE_URL   default http://127.0.0.1:5173/raytracing/
  *   OUT_DIR    default notes/GROK/validation/goethe
- *   SAMPLES    default 32 (still-mode target before screenshot)
+ *   SAMPLES    default 64 (still-mode target before screenshot)
+ *   RENDER_SCALE default 1.0 (internal path-trace resolution)
+ *   SPP        samples per frame during still (default 2)
+ *   CHAPTER    optional single chapter id (e.g. atmosphere) — skip hash check
+ *   SKIP_HASH  set 1 to skip #chapter=shadows spot-check
  *   HEADED     set 1 to show browser
+ *
+ * Single chapter (for subagent handoffs):
+ *   CHAPTER=atmosphere SAMPLES=64 npm run smoke:goethe:one
  */
 
 import { chromium } from 'playwright';
@@ -28,7 +35,13 @@ const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:5173/raytracing/';
 const OUT_DIR = process.env.OUT_DIR
   ? path.resolve(process.env.OUT_DIR)
   : path.join(root, 'notes/GROK/validation/goethe');
-const SAMPLES = Number(process.env.SAMPLES || 32);
+const SAMPLES = Number(process.env.SAMPLES || 64);
+const RENDER_SCALE = Math.min(1, Math.max(0.5, Number(process.env.RENDER_SCALE || 1)));
+const SPP = Math.max(1, Number(process.env.SPP || 2));
+const CHAPTER_ONLY = (process.env.CHAPTER || process.argv.find((a) => a.startsWith('--chapter='))?.split('=')[1] || '')
+  .trim()
+  .toLowerCase();
+const SKIP_HASH = process.env.SKIP_HASH === '1' || !!CHAPTER_ONLY;
 const HEADED = process.env.HEADED === '1';
 
 /**
@@ -230,17 +243,22 @@ async function captureChapter(page, row, index) {
 
   try {
     await page.evaluate(
-      ({ chapterId }) => {
+      ({ chapterId, renderScale, spp }) => {
         const api = window.__oceanscape;
         if (!api?.ready) throw new Error('__oceanscape not ready');
         const t = api.tracer;
-        t.params.samplesPerFrame = Math.max(t.params.samplesPerFrame || 1, 1);
-        t.params.renderScale = Math.max(t.params.renderScale, 0.85);
-        t.applyRenderScale();
+        // Apply chapter first (presets set quality), then force capture-quality overrides
         api.applyChapter(/** @type {any} */ (chapterId));
+        t.params.samplesPerFrame = Math.max(t.params.samplesPerFrame || 1, spp);
+        t.params.renderScale = renderScale;
+        t.applyRenderScale();
         api.freezeForCapture();
+        // Re-assert after freeze (freeze may not touch scale)
+        t.params.renderScale = renderScale;
+        t.params.samplesPerFrame = Math.max(t.params.samplesPerFrame || 1, spp);
+        t.applyRenderScale();
       },
-      { chapterId: row.chapterId },
+      { chapterId: row.chapterId, renderScale: RENDER_SCALE, spp: SPP },
     );
   } catch (err) {
     errors.push(err instanceof Error ? err.message : String(err));
@@ -498,6 +516,17 @@ async function main() {
     process.exit(1);
   }
 
+  /** @type {typeof OBSERVATION_MATRIX} */
+  let rows = OBSERVATION_MATRIX;
+  if (CHAPTER_ONLY) {
+    rows = OBSERVATION_MATRIX.filter((r) => r.chapterId === CHAPTER_ONLY);
+    if (rows.length === 0) {
+      console.error(`FATAL: unknown CHAPTER="${CHAPTER_ONLY}". Valid: ${EXPECTED_IDS.join(', ')}`);
+      process.exit(1);
+    }
+    console.log(`Single-chapter mode: ${CHAPTER_ONLY} (renderScale=${RENDER_SCALE} spp=${SPP} samples=${SAMPLES})`);
+  }
+
   const browser = await chromium.launch({ headless: !HEADED });
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 
@@ -509,8 +538,8 @@ async function main() {
     await page.goto(BASE_URL, { waitUntil: 'networkidle', timeout: 30000 });
     await waitForApi(page);
 
-    for (let i = 0; i < OBSERVATION_MATRIX.length; i++) {
-      const row = OBSERVATION_MATRIX[i];
+    for (const row of rows) {
+      const i = OBSERVATION_MATRIX.findIndex((r) => r.chapterId === row.chapterId);
       process.stdout.write(`· ${String(i + 1).padStart(2, '0')}-${row.chapterId} … `);
       const r = await captureChapter(page, row, i);
       results.push(r);
@@ -522,10 +551,13 @@ async function main() {
       }
     }
 
-    // Hash restore after chapter loop (fresh navigation)
-    process.stdout.write('· hash #chapter=shadows … ');
-    hashCheck = await hashSpotCheck(page);
-    console.log(hashCheck.ok ? 'OK' : 'FAIL');
+    if (!SKIP_HASH) {
+      process.stdout.write('· hash #chapter=shadows … ');
+      hashCheck = await hashSpotCheck(page);
+      console.log(hashCheck.ok ? 'OK' : 'FAIL');
+    } else {
+      console.log('· hash spot-check skipped (single-chapter or SKIP_HASH=1)');
+    }
   } catch (err) {
     fatal = err instanceof Error ? err.message : String(err);
     console.error('FATAL:', fatal);
@@ -533,19 +565,20 @@ async function main() {
     await browser.close();
   }
 
-  const allStructuralPass =
-    !fatal &&
-    results.length === 16 &&
-    results.every((r) => r.status === 'PASS') &&
-    (hashCheck?.ok ?? false);
+  const structuralOk =
+    !fatal && results.length === rows.length && results.every((r) => r.status === 'PASS');
+  const allStructuralPass = structuralOk && (SKIP_HASH || (hashCheck?.ok ?? false));
 
   const report = {
     generatedAt: new Date().toISOString(),
     baseUrl: BASE_URL,
     samplesTarget: SAMPLES,
+    renderScale: RENDER_SCALE,
+    spp: SPP,
+    chapterOnly: CHAPTER_ONLY || null,
     purpose:
       'Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§',
-    expectedChapters: EXPECTED_IDS,
+    expectedChapters: CHAPTER_ONLY ? [CHAPTER_ONLY] : EXPECTED_IDS,
     results,
     hashCheck,
     fatal,
@@ -555,14 +588,40 @@ async function main() {
       pass: results.filter((r) => r.status === 'PASS').length,
       fail: results.filter((r) => r.status === 'FAIL').length,
       badgeFailures: results.filter((r) => !r.badgeOk).map((r) => r.chapterId),
-      hashOk: hashCheck?.ok ?? false,
+      hashOk: SKIP_HASH ? null : (hashCheck?.ok ?? false),
     },
   };
 
-  const reportPath = path.join(OUT_DIR, 'SMOKE_REPORT.json');
-  const mdPath = path.join(OUT_DIR, 'SMOKE_REPORT.md');
+  const reportSuffix = CHAPTER_ONLY ? `-${CHAPTER_ONLY}` : '';
+  const reportPath = path.join(OUT_DIR, `SMOKE_REPORT${reportSuffix}.json`);
+  const mdPath = path.join(OUT_DIR, `SMOKE_REPORT${reportSuffix}.md`);
   await writeFile(reportPath, JSON.stringify(report, null, 2));
   await writeFile(mdPath, buildMarkdown(report));
+
+  // Also write a tiny VERDICT for subagents
+  if (CHAPTER_ONLY && results[0]) {
+    const r = results[0];
+    const verdictPath = path.join(OUT_DIR, `VERDICT-${CHAPTER_ONLY}.md`);
+    await writeFile(
+      verdictPath,
+      [
+        `# Verdict — ${CHAPTER_ONLY}`,
+        '',
+        `- Structural: **${r.status}**`,
+        `- Badge: ${r.badgeOk ? 'OK' : 'FAIL'} (\`${r.badgeActual}\` vs \`${r.badgeExpected}\`)`,
+        `- Samples: ${r.samples} (${r.mode})`,
+        `- PNG: \`${r.capturePath || 'none'}\``,
+        `- Goethe §: ${r.section}`,
+        `- Quote: ${r.quote}`,
+        `- Goethe saw: ${r.goetheSaw}`,
+        `- User should see: ${r.userShouldSee}`,
+        '',
+        '**Next:** Open the PNG with the read_file tool and judge visual/philosophical fidelity. Fix PathTracer.applyChapterPreset if needed, re-run CHAPTER=… smoke.',
+        '',
+      ].join('\n'),
+    );
+    console.log(`Verdict: ${path.relative(root, verdictPath)}`);
+  }
 
   console.log(`\nReport: ${path.relative(root, mdPath)}`);
   console.log(`JSON:   ${path.relative(root, reportPath)}`);

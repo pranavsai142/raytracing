@@ -1,0 +1,316 @@
+{
+  "generatedAt": "2026-07-10T00:53:17.891Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "targetSamples": 96,
+  "verdict": "NO_BLACKOUT_IN_HEADLESS",
+  "note": "Luminance from screenshot PNGs (not WebGL readPixels). Headless ANGLE may differ from your GPU.",
+  "results": [
+    {
+      "id": "ocean-underwater",
+      "label": "Ocean default underwater (user path)",
+      "blacked": false,
+      "ratio": 1.012242073437196,
+      "liveMean": 93.40934,
+      "lateMean": 94.552864,
+      "lateDark": 0.0003743028743028743,
+      "steps": [
+        {
+          "name": "ocean-underwater__01-live",
+          "meanY": 93.40934,
+          "darkFrac": 0.010929858429858429,
+          "blackFrac": 0.00565958815958816,
+          "samples": 2,
+          "mode": "live"
+        },
+        {
+          "name": "ocean-underwater__02-still-t0",
+          "meanY": 94.67505,
+          "darkFrac": 0.00019412269412269413,
+          "blackFrac": 0.00012119262119262119,
+          "samples": 62,
+          "mode": "still"
+        },
+        {
+          "name": "ocean-underwater__03-still-s16",
+          "meanY": 94.641716,
+          "darkFrac": 0.00025418275418275416,
+          "blackFrac": 0.00018125268125268124,
+          "samples": 88,
+          "mode": "still"
+        },
+        {
+          "name": "ocean-underwater__04-still-s48",
+          "meanY": 94.602554,
+          "darkFrac": 0.00030673530673530673,
+          "blackFrac": 0.00023380523380523382,
+          "samples": 114,
+          "mode": "still"
+        },
+        {
+          "name": "ocean-underwater__05-still-sTarget",
+          "meanY": 94.552864,
+          "darkFrac": 0.0003743028743028743,
+          "blackFrac": 0.0003013728013728014,
+          "samples": 142,
+          "mode": "still"
+        }
+      ]
+    },
+    {
+      "id": "ocean-abyss",
+      "label": "Ocean underwater + Abyss floor (no substrate)",
+      "blacked": false,
+      "ratio": 1.0351521730772326,
+      "liveMean": 34.904926,
+      "lateMean": 36.13191,
+      "lateDark": 0.006377091377091377,
+      "steps": [
+        {
+          "name": "ocean-abyss__01-live",
+          "meanY": 34.904926,
+          "darkFrac": 0.04806091806091806,
+          "blackFrac": 0.005767910767910768,
+          "samples": 2,
+          "mode": "live"
+        },
+        {
+          "name": "ocean-abyss__02-still-t0",
+          "meanY": 35.974075,
+          "darkFrac": 0.012131059631059631,
+          "blackFrac": 0,
+          "samples": 46,
+          "mode": "still"
+        },
+        {
+          "name": "ocean-abyss__03-still-s16",
+          "meanY": 36.049763,
+          "darkFrac": 0.009204204204204204,
+          "blackFrac": 0,
+          "samples": 68,
+          "mode": "still"
+        },
+        {
+          "name": "ocean-abyss__04-still-s48",
+          "meanY": 36.094654,
+          "darkFrac": 0.007486057486057486,
+          "blackFrac": 0,
+          "samples": 90,
+          "mode": "still"
+        },
+        {
+          "name": "ocean-abyss__05-still-sTarget",
+          "meanY": 36.13191,
+          "darkFrac": 0.006377091377091377,
+          "blackFrac": 0,
+          "samples": 118,
+          "mode": "still"
+        }
+      ]
+    },
+    {
+      "id": "ocean-lookup",
+      "label": "Ocean STILL look-up Snell",
+      "blacked": false,
+      "ratio": 1.0035427198361593,
+      "liveMean": 127.409454,
+      "lateMean": 127.86083,
+      "lateDark": 0.005633848133848133,
+      "steps": [
+        {
+          "name": "ocean-lookup__01-live",
+          "meanY": 127.409454,
+          "darkFrac": 0.003019090519090519,
+          "blackFrac": 0.0017503217503217503,
+          "samples": 2,
+          "mode": "live"
+        },
+        {
+          "name": "ocean-lookup__02-still-t0",
+          "meanY": 128.3837,
+          "darkFrac": 0.00289039039039039,
+          "blackFrac": 0.00289039039039039,
+          "samples": 58,
+          "mode": "still"
+        },
+        {
+          "name": "ocean-lookup__03-still-s16",
+          "meanY": 128.21832,
+          "darkFrac": 0.0041902616902616905,
+          "blackFrac": 0.0041902616902616905,
+          "samples": 96,
+          "mode": "still"
+        },
+        {
+          "name": "ocean-lookup__04-still-s48",
+          "meanY": 128.0375,
+          "darkFrac": 0.005007507507507508,
+          "blackFrac": 0.005007507507507508,
+          "samples": 134,
+          "mode": "still"
+        },
+        {
+          "name": "ocean-lookup__05-still-sTarget",
+          "meanY": 127.86083,
+          "darkFrac": 0.005633848133848133,
+          "blackFrac": 0.005633848133848133,
+          "samples": 170,
+          "mode": "still"
+        }
+      ]
+    },
+    {
+      "id": "mirror-floor",
+      "label": "Mirror floor underwater (bounce paths)",
+      "blacked": false,
+      "ratio": 1.1697147693999306,
+      "liveMean": 57.36902,
+      "lateMean": 67.10539,
+      "lateDark": 0.00021879021879021878,
+      "steps": [
+        {
+          "name": "mirror-floor__01-live",
+          "meanY": 57.36902,
+          "darkFrac": 0.059905619905619906,
+          "blackFrac": 0.00611969111969112,
+          "samples": 2,
+          "mode": "live"
+        },
+        {
+          "name": "mirror-floor__02-still-t0",
+          "meanY": 66.12146,
+          "darkFrac": 0.0018865293865293865,
+          "blackFrac": 0,
+          "samples": 60,
+          "mode": "still"
+        },
+        {
+          "name": "mirror-floor__03-still-s16",
+          "meanY": 66.75835,
+          "darkFrac": 0.0005426855426855427,
+          "blackFrac": 0,
+          "samples": 98,
+          "mode": "still"
+        },
+        {
+          "name": "mirror-floor__04-still-s48",
+          "meanY": 67.00683,
+          "darkFrac": 0.00030244530244530245,
+          "blackFrac": 0,
+          "samples": 136,
+          "mode": "still"
+        },
+        {
+          "name": "mirror-floor__05-still-sTarget",
+          "meanY": 67.10539,
+          "darkFrac": 0.00021879021879021878,
+          "blackFrac": 0,
+          "samples": 174,
+          "mode": "still"
+        }
+      ]
+    },
+    {
+      "id": "double-reflect",
+      "label": "Double-reflect chapter STILL",
+      "blacked": false,
+      "ratio": 1.04896838487163,
+      "liveMean": 75.56161,
+      "lateMean": 79.26174,
+      "lateDark": 0.22351673101673103,
+      "steps": [
+        {
+          "name": "double-reflect__01-live",
+          "meanY": 75.56161,
+          "darkFrac": 0.3776244101244101,
+          "blackFrac": 0.0418961818961819,
+          "samples": 2,
+          "mode": "live"
+        },
+        {
+          "name": "double-reflect__02-still-t0",
+          "meanY": 79.087585,
+          "darkFrac": 0.2902906477906478,
+          "blackFrac": 0.014098026598026598,
+          "samples": 46,
+          "mode": "still"
+        },
+        {
+          "name": "double-reflect__03-still-s16",
+          "meanY": 79.22061,
+          "darkFrac": 0.25295045045045045,
+          "blackFrac": 0.011496138996138995,
+          "samples": 68,
+          "mode": "still"
+        },
+        {
+          "name": "double-reflect__04-still-s48",
+          "meanY": 79.257515,
+          "darkFrac": 0.2353024453024453,
+          "blackFrac": 0.009601029601029602,
+          "samples": 90,
+          "mode": "still"
+        },
+        {
+          "name": "double-reflect__05-still-sTarget",
+          "meanY": 79.26174,
+          "darkFrac": 0.22351673101673103,
+          "blackFrac": 0.007808880308880309,
+          "samples": 120,
+          "mode": "still"
+        }
+      ]
+    },
+    {
+      "id": "high-sigma-underwater",
+      "label": "High volumeSigma underwater",
+      "blacked": false,
+      "ratio": 1.0241099416529584,
+      "liveMean": 73.97633,
+      "lateMean": 75.759895,
+      "lateDark": 0.0009749034749034749,
+      "steps": [
+        {
+          "name": "high-sigma-underwater__01-live",
+          "meanY": 73.97633,
+          "darkFrac": 0.014282496782496783,
+          "blackFrac": 0.0020656370656370656,
+          "samples": 2,
+          "mode": "live"
+        },
+        {
+          "name": "high-sigma-underwater__02-still-t0",
+          "meanY": 75.61677,
+          "darkFrac": 0.00036786786786786787,
+          "blackFrac": 0.00029493779493779495,
+          "samples": 46,
+          "mode": "still"
+        },
+        {
+          "name": "high-sigma-underwater__03-still-s16",
+          "meanY": 75.70995,
+          "darkFrac": 0.0005705705705705706,
+          "blackFrac": 0.0004976404976404976,
+          "samples": 68,
+          "mode": "still"
+        },
+        {
+          "name": "high-sigma-underwater__04-still-s48",
+          "meanY": 75.74668,
+          "darkFrac": 0.0007443157443157443,
+          "blackFrac": 0.0006713856713856714,
+          "samples": 90,
+          "mode": "still"
+        },
+        {
+          "name": "high-sigma-underwater__05-still-sTarget",
+          "meanY": 75.759895,
+          "darkFrac": 0.0009749034749034749,
+          "blackFrac": 0.000901973401973402,
+          "samples": 118,
+          "mode": "still"
+        }
+      ]
+    }
+  ],
+  "fatal": null
+}

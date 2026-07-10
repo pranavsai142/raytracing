@@ -3,22 +3,66 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Oceanscape — Goethe Theory of Colours</title>
+    <title>Oceanscape — Light at the Water Surface</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <div id="app">
       <canvas id="canvas"></canvas>
-      <div id="ui">
+
+      <!-- Production first-run: dimmed path-trace under intro until Enter -->
+      <div id="intro-overlay" class="intro-overlay" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+        <div class="intro-card">
+          <p class="intro-kicker">Path-traced · physical dielectric</p>
+          <h1 id="intro-title">Oceanscape</h1>
+          <p class="intro-lead">
+            Literally reproduce light at the ocean surface: reflection, refraction (Snell),
+            and total internal reflection that traps light underwater until the angle allows escape.
+          </p>
+          <ul class="intro-bullets">
+            <li><strong>STILL</strong> — frozen waves + cube; progressive path-trace cleans noise</li>
+            <li><strong>LIVE</strong> — turn on Animate for realtime path-trace</li>
+            <li><strong>Cube</strong> — textured validation geometry under the water plane</li>
+          </ul>
+          <button type="button" id="enter-oceanscape" class="intro-enter">Enter Oceanscape</button>
+          <p class="intro-hint">Press <kbd>Enter</kbd> · drag to look · <kbd>WASD</kbd> to fly</p>
+        </div>
+      </div>
+
+      <div id="controls-legend" class="controls-legend" hidden>
+        <div class="controls-legend-inner">
+          <span class="ctrl-chip"><strong>Drag</strong> look</span>
+          <span class="ctrl-chip"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> fly</span>
+          <span class="ctrl-chip"><kbd>Q</kbd>/<kbd>E</kbd> up/down</span>
+          <span class="ctrl-chip" id="legend-mode">STILL accumulate</span>
+          <label class="ctrl-chip ctrl-animate tip" data-tip="Uncheck = STILL freeze + progressive samples. Check = LIVE realtime path-trace.">
+            <input type="checkbox" id="legend-animate" /> Animate
+          </label>
+        </div>
+      </div>
+
+      <button type="button" id="menu-toggle" class="menu-toggle" aria-expanded="false" aria-controls="ui" title="Open menu">Menu</button>
+      <div id="ui" class="ui-panel">
         <header>
           <h1>Oceanscape</h1>
-          <p class="subtitle">Goethe saw them — interactive visual book</p>
+          <p class="subtitle">Light physics at the air–water interface</p>
           <div id="chapter-badge" class="chapter-badge badge-physical">PHYSICAL</div>
           <p id="chapter-caption" class="chapter-caption">Dielectric interface path tracer</p>
         </header>
 
         <div class="panel-scroll">
-          <details class="panel-section" open>
+          <details class="panel-section" id="controls-section" open>
+            <summary>Controls</summary>
+            <div class="section-body controls-help">
+              <p><strong>Look:</strong> drag on the view</p>
+              <p><strong>Move:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>Q</kbd>/<kbd>E</kbd> up/down</p>
+              <p><strong>STILL:</strong> Animate off — freeze waves+cube, accumulate clean stills</p>
+              <p><strong>LIVE:</strong> Animate on — realtime path-trace (no history blend)</p>
+              <p class="hint-muted">All advanced menus stay available below when expanded.</p>
+            </div>
+          </details>
+
+          <details class="panel-section">
             <summary>Goethe Chapters</summary>
             <div class="section-body">
               <div class="chapter-grid">
@@ -45,7 +89,7 @@
             </div>
           </details>
 
-          <details class="panel-section" open>
+          <details class="panel-section">
             <summary>Render Quality</summary>
             <div class="section-body">
               <label class="tip" data-tip="Path-traced samples integrated per LIVE frame, or added per STILL sample tick. Higher = less noise, more GPU cost.">
@@ -78,7 +122,7 @@
             </div>
           </details>
 
-          <details class="panel-section" open>
+          <details class="panel-section">
             <summary>Water Physics</summary>
             <div class="section-body">
               <label class="tip" data-tip="Relative index of refraction air→water. 1.33 is real water. Higher = stronger bending and a smaller Snell's window from below.">
@@ -106,7 +150,7 @@
             </div>
           </details>
 
-          <details class="panel-section" open>
+          <details class="panel-section">
             <summary>Wave Topology</summary>
             <div class="section-body">
               <label class="tip" data-tip="Legacy macro amplitude (max 0.12). Ocean multi-octave: rebuilds 4 directional octaves (amp×0.52 each) then scales so total peak ≤0.22 and |A|·k ≤0.35. Single/Standing: primary amplitude. Named presets set their own macros. Custom: does not rewrite components — edit below. Tilts normals and TIR escape angles.">
@@ -122,7 +166,7 @@
                 Time Scale <input type="range" id="time-scale" min="0" max="1" step="0.01" value="0.15" /><span id="time-scale-val">0.15</span>
               </label>
               <label class="tip" data-tip="ON = LIVE path-trace (realtime, noisy, no history blend). OFF = STILL: freeze waves+cube and progressive-accumulate so Snell/TIR/caustics converge. Use STILL for clean stills of trapped ocean light.">
-                <input type="checkbox" id="animate-waves" checked /> Animate Scene (LIVE)
+                <input type="checkbox" id="animate-waves" /> Animate Scene (LIVE path-trace)
               </label>
 
               <details class="nested-section">
@@ -176,7 +220,7 @@
             </div>
           </details>
 
-          <details class="panel-section" open>
+          <details class="panel-section">
             <summary>Lighting &amp; Volume</summary>
             <div class="section-body">
               <h3 class="subsection">Sun</h3>
@@ -281,12 +325,12 @@
                 Secondary Reflect <input type="range" id="secondary-reflect" min="0" max="1" step="0.05" value="0" /><span id="secondary-reflect-val">0</span>
               </label>
               <label class="tip" data-tip="Floor/plane reflectance for bounce light in double-reflect and land-side scenes.">
-                Floor Reflectance <input type="range" id="floor-refl" min="0" max="0.5" step="0.01" value="0.15" /><span id="floor-refl-val">0.15</span>
+                Floor Reflectance <input type="range" id="floor-refl" min="0" max="1" step="0.01" value="0.15" /><span id="floor-refl-val">0.15</span>
               </label>
             </div>
           </details>
 
-          <details class="panel-section" open>
+          <details class="panel-section">
             <summary>Scene / Cube</summary>
             <div class="section-body">
               <label class="tip" data-tip="World Y of the submerged dielectric test cube. Closer to surface = stronger caustic interaction.">
@@ -301,7 +345,71 @@
             </div>
           </details>
 
-          <details class="panel-section" open>
+          <details class="panel-section">
+            <summary class="tip" data-tip="Seafloor is substrate only — water colour comes from path physics (absorption, scatter, IOR), not floor pigment.">Seafloor</summary>
+            <div class="section-body">
+              <div class="chapter-grid" id="floor-presets" style="margin-bottom: 6px;">
+                <button type="button" class="chapter-btn tip" data-floor-preset="abyss" data-tip="Disable floor (or deep plane) — mid-water without substrate wash.">Abyss</button>
+                <button type="button" class="chapter-btn tip" data-floor-preset="sand" data-tip="Pale sand plane at y=-3.5, low bump, diffuse.">Sand</button>
+                <button type="button" class="chapter-btn tip" data-floor-preset="gravel" data-tip="Ocean gravel default: warm sand gravel, medium bump.">Gravel</button>
+                <button type="button" class="chapter-btn tip" data-floor-preset="white" data-tip="Goethe white card: flat uniform white at y=-5.8 (shadows).">White</button>
+                <button type="button" class="chapter-btn tip" data-floor-preset="mirror" data-tip="Mirror floor at y=-2.5 for double-reflection demos.">Mirror</button>
+                <button type="button" class="chapter-btn tip" data-floor-preset="split" data-tip="Yellow|white split floor at y=-5.8 (simultaneous contrast §56).">Split</button>
+              </div>
+              <label class="tip" data-tip="When off, intersectFloor misses (no floor plane).">
+                <input type="checkbox" id="floor-enabled" checked /> Floor enabled
+              </label>
+              <label class="tip" data-tip="World Y of the seafloor mean plane. Rod Y band is [floorHeight, floorHeight+2]. Goethe shadows/contrast use -5.8.">
+                Height <input type="range" id="floor-height" min="-12" max="-0.5" step="0.1" value="-3.5" /><span id="floor-height-val">-3.5</span>
+              </label>
+              <label class="tip" data-tip="Albedo pattern: uniform / gravel / sand / split yellow|white (Goethe §56) / checker grid.">
+                Pattern
+                <select id="floor-pattern">
+                  <option value="0">Uniform</option>
+                  <option value="1" selected>Gravel</option>
+                  <option value="2">Sand</option>
+                  <option value="3">Split Y|W</option>
+                  <option value="4">Checker</option>
+                </select>
+              </label>
+              <label class="tip" data-tip="BRDF class: diffuse (Lambert) · glossy (Blinn specular) · mirror (path continues bounce).">
+                Material
+                <select id="floor-material">
+                  <option value="0" selected>Diffuse</option>
+                  <option value="1">Glossy</option>
+                  <option value="2">Mirror</option>
+                </select>
+              </label>
+              <label class="tip" data-tip="Base seafloor tint (RGB 0–1), multiplied by Albedo Scale. Ocean gravel default is warm sand.">
+                Albedo R <input type="range" id="floor-alb-r" min="0" max="1" step="0.01" value="0.55" />
+                G <input type="range" id="floor-alb-g" min="0" max="1" step="0.01" value="0.48" />
+                B <input type="range" id="floor-alb-b" min="0" max="1" step="0.01" value="0.32" />
+              </label>
+              <label class="tip" data-tip="Brightness multiplier on base albedo (0.05 abyss … 0.9 white card). Shadows chapter uses ~0.9.">
+                Albedo Scale <input type="range" id="floor-alb-scale" min="0.05" max="1" step="0.01" value="0.4" /><span id="floor-alb-scale-val">0.40</span>
+              </label>
+              <label class="tip" data-tip="Height-noise amplitude for gravel/sand bump. 0 = flat plane (science cards).">
+                Bump Amp <input type="range" id="floor-bump-amp" min="0" max="0.4" step="0.01" value="0.06" /><span id="floor-bump-amp-val">0.06</span>
+              </label>
+              <label class="tip" data-tip="Spatial frequency of floor bump / gravel noise.">
+                Bump Freq <input type="range" id="floor-bump-freq" min="0.1" max="8" step="0.1" value="2.5" /><span id="floor-bump-freq-val">2.5</span>
+              </label>
+              <label class="tip" data-tip="Octaves of floor height noise (1–4). More = finer gravel detail.">
+                Bump Octaves <input type="range" id="floor-bump-octaves" min="1" max="4" step="1" value="3" /><span id="floor-bump-octaves-val">3</span>
+              </label>
+              <label class="tip" data-tip="Microfacet / Blinn roughness for glossy floor (0 sharp … 1 dull).">
+                Roughness <input type="range" id="floor-rough" min="0" max="1" step="0.01" value="0.55" /><span id="floor-rough-val">0.55</span>
+              </label>
+              <label class="tip" data-tip="Specular weight for glossy Blinn and mirror Fresnel floor.">
+                Specular <input type="range" id="floor-spec" min="0" max="1" step="0.01" value="0.05" /><span id="floor-spec-val">0.05</span>
+              </label>
+              <label class="tip" data-tip="Checker cells per world unit when Pattern = Checker. 0 treated as 0.5.">
+                Checker Scale <input type="range" id="floor-checker" min="0" max="8" step="0.1" value="0" /><span id="floor-checker-val">0.0</span>
+              </label>
+            </div>
+          </details>
+
+          <details class="panel-section">
             <summary>Camera</summary>
             <div class="section-body">
               <label class="tip" data-tip="Vertical field of view in degrees for the path-traced camera.">

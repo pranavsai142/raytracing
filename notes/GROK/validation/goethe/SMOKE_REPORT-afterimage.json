@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:33:54.923Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "afterimage",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "afterimage"
+  ],
+  "results": [
+    {
+      "chapterId": "afterimage",
+      "section": "§50",
+      "quote": "Opponent colour floats on neutral ground",
+      "goetheSaw": "After fixation on a colour, the opponent colour appears floating on a neutral ground (physiological).",
+      "userShouldSee": "Fixation / opponent afterimage layer labeled PHYSIOLOGICAL (viewer); not smuggled into water radiance.",
+      "badgeExpected": "PHYSIOLOGICAL (viewer)",
+      "badgeActual": "PHYSIOLOGICAL (viewer)",
+      "badgeOk": true,
+      "caption": "§50 — Opponent colour floats on neutral ground",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/09-afterimage.png",
+      "captureOk": true,
+      "fileBase": "09-afterimage",
+      "status": "PASS",
+      "notes": "Opponent afterimage is inherently visual/human; STILL freeze ok for structure. Review PNG for fixation plane; colour match not automatable.",
+      "visualChecklist": "Fixation / opponent afterimage layer labeled PHYSIOLOGICAL (viewer); not smuggled into water radiance.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

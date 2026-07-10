@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:34:40.227Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "twilight",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "twilight"
+  ],
+  "results": [
+    {
+      "chapterId": "twilight",
+      "section": "§85",
+      "quote": "Faint lights appear coloured at night",
+      "goetheSaw": "At night / twilight, faint lights (moon, candle) appear distinctly coloured.",
+      "userShouldSee": "Low ambient with moon/candle-style lights tinted; MIXED badge.",
+      "badgeExpected": "MIXED",
+      "badgeActual": "MIXED",
+      "badgeOk": true,
+      "caption": "§85 — Faint lights appear coloured at night",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/10-twilight.png",
+      "captureOk": true,
+      "fileBase": "10-twilight",
+      "status": "PASS",
+      "notes": "",
+      "visualChecklist": "Low ambient with moon/candle-style lights tinted; MIXED badge.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

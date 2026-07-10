@@ -1,0 +1,160 @@
+{
+  "steps": [
+    {
+      "name": "01-live-above",
+      "lum": {
+        "meanY": 108.64,
+        "black": 0,
+        "dark": 0.0005,
+        "bright": 0.9966,
+        "minY": 0,
+        "p50": 110.2
+      },
+      "meta": {
+        "mode": "live",
+        "samples": 2,
+        "stats": "LIVE path-trace · 2 spp · 1400×900 · ocean · uncheck Animate for clean accum",
+        "camY": 3.2,
+        "under": false,
+        "anim": true
+      }
+    },
+    {
+      "name": "02-still-t0",
+      "lum": {
+        "meanY": 111.39,
+        "black": 0,
+        "dark": 0,
+        "bright": 1,
+        "minY": 0,
+        "p50": 113.3
+      },
+      "meta": {
+        "mode": "still",
+        "samples": 62,
+        "stats": "STILL accum 62/256 (24%) · 1400×900 · ocean",
+        "camY": 3.2,
+        "under": false,
+        "anim": false
+      }
+    },
+    {
+      "name": "03-still-s16",
+      "lum": {
+        "meanY": 111.33,
+        "black": 0,
+        "dark": 0,
+        "bright": 1,
+        "minY": 0,
+        "p50": 113.3
+      },
+      "meta": {
+        "mode": "still",
+        "samples": 90,
+        "stats": "STILL accum 90/256 (35%) · 1400×900 · ocean",
+        "camY": 3.2,
+        "under": false,
+        "anim": false
+      }
+    },
+    {
+      "name": "03-still-s32",
+      "lum": {
+        "meanY": 111.23,
+        "black": 0,
+        "dark": 0,
+        "bright": 1,
+        "minY": 0,
+        "p50": 113.2
+      },
+      "meta": {
+        "mode": "still",
+        "samples": 118,
+        "stats": "STILL accum 118/256 (46%) · 1400×900 · ocean",
+        "camY": 3.2,
+        "under": false,
+        "anim": false
+      }
+    },
+    {
+      "name": "03-still-s64",
+      "lum": {
+        "meanY": 111.12,
+        "black": 0,
+        "dark": 0,
+        "bright": 1,
+        "minY": 0,
+        "p50": 113.1
+      },
+      "meta": {
+        "mode": "still",
+        "samples": 146,
+        "stats": "STILL accum 146/256 (57%) · 1400×900 · ocean",
+        "camY": 3.2,
+        "under": false,
+        "anim": false
+      }
+    },
+    {
+      "name": "03-still-s128",
+      "lum": {
+        "meanY": 111.01,
+        "black": 0,
+        "dark": 0,
+        "bright": 1,
+        "minY": 0,
+        "p50": 113
+      },
+      "meta": {
+        "mode": "still",
+        "samples": 172,
+        "stats": "STILL accum 172/256 (67%) · 1400×900 · ocean",
+        "camY": 3.2,
+        "under": false,
+        "anim": false
+      }
+    },
+    {
+      "name": "03-still-s200",
+      "lum": {
+        "meanY": 110.78,
+        "black": 0,
+        "dark": 0,
+        "bright": 1,
+        "minY": 0,
+        "p50": 112.8
+      },
+      "meta": {
+        "mode": "still",
+        "samples": 226,
+        "stats": "STILL accum 226/256 (88%) · 1400×900 · ocean",
+        "camY": 3.2,
+        "under": false,
+        "anim": false
+      }
+    },
+    {
+      "name": "04-lookAtCubeAbove-s96",
+      "lum": {
+        "meanY": 111.22,
+        "black": 0,
+        "dark": 0,
+        "bright": 1,
+        "minY": 0,
+        "p50": 113.2
+      },
+      "meta": {
+        "mode": "still",
+        "samples": 128,
+        "stats": "STILL accum 128/256 (50%) · 1400×900 · ocean",
+        "camY": 3.2,
+        "under": true,
+        "anim": false
+      }
+    }
+  ],
+  "live": 108.64,
+  "late": 110.78,
+  "ratio": 1.0196980854197348,
+  "blacked": false
+}

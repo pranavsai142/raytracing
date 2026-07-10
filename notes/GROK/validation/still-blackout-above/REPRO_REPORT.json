@@ -1,0 +1,613 @@
+{
+  "generatedAt": "2026-07-10T01:09:08.995Z",
+  "focus": "ABOVE_WATER_THEN_STILL_WAIT",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "targetSamples": 128,
+  "verdict": "NO_BLACKOUT_ABOVE_WATER_HEADLESS",
+  "results": [
+    {
+      "id": "default-above",
+      "blacked": false,
+      "ratio": 1.0254952810452898,
+      "liveMean": 108.38947,
+      "lateMean": 111.15289,
+      "steps": [
+        {
+          "name": "default-above__01-live",
+          "png": "notes/GROK/validation/still-blackout-above/default-above__01-live.png",
+          "lum": {
+            "ok": true,
+            "meanY": 108.38947,
+            "blackFrac": 0.000011797511797511798,
+            "darkFrac": 0.000052552552552552556,
+            "brightFrac": 0.9988524238524239,
+            "topY": 110.41518,
+            "midY": 108.60207,
+            "botY": 106.15116
+          },
+          "meta": {
+            "mode": "live",
+            "samples": 2,
+            "stats": "LIVE path-trace · 2 spp · 1400×900 · ocean · uncheck Animate for clean accum",
+            "animate": true,
+            "underwaterView": false,
+            "camY": 3.2,
+            "cam": [
+              0,
+              3.2,
+              5
+            ],
+            "target": [
+              0,
+              -2.2,
+              0
+            ]
+          }
+        },
+        {
+          "name": "default-above__02-still-t0",
+          "png": "notes/GROK/validation/still-blackout-above/default-above__02-still-t0.png",
+          "lum": {
+            "ok": true,
+            "meanY": 111.40011,
+            "blackFrac": 0.00007507507507507507,
+            "darkFrac": 0.00007507507507507507,
+            "brightFrac": 0.9999152724152724,
+            "topY": 115.03937,
+            "midY": 111.05261,
+            "botY": 108.10835
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 44,
+            "stats": "STILL accum 44/256 (17%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 3.2,
+            "cam": [
+              0,
+              3.2,
+              5
+            ],
+            "target": [
+              0,
+              -2.2,
+              0
+            ]
+          }
+        },
+        {
+          "name": "default-above__03-still-s16",
+          "png": "notes/GROK/validation/still-blackout-above/default-above__03-still-s16.png",
+          "lum": {
+            "ok": true,
+            "meanY": 111.420654,
+            "blackFrac": 0.0001254826254826255,
+            "darkFrac": 0.0001254826254826255,
+            "brightFrac": 0.9998680823680823,
+            "topY": 115.105995,
+            "midY": 111.05732,
+            "botY": 108.098625
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 66,
+            "stats": "STILL accum 66/256 (26%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 3.2,
+            "cam": [
+              0,
+              3.2,
+              5
+            ],
+            "target": [
+              0,
+              -2.2,
+              0
+            ]
+          }
+        },
+        {
+          "name": "default-above__03-still-s48",
+          "png": "notes/GROK/validation/still-blackout-above/default-above__03-still-s48.png",
+          "lum": {
+            "ok": true,
+            "meanY": 111.38041,
+            "blackFrac": 0.00016731016731016732,
+            "darkFrac": 0.00016731016731016732,
+            "brightFrac": 0.9998262548262549,
+            "topY": 115.08759,
+            "midY": 111.010735,
+            "botY": 108.04292
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 88,
+            "stats": "STILL accum 88/256 (34%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 3.2,
+            "cam": [
+              0,
+              3.2,
+              5
+            ],
+            "target": [
+              0,
+              -2.2,
+              0
+            ]
+          }
+        },
+        {
+          "name": "default-above__03-still-s96",
+          "png": "notes/GROK/validation/still-blackout-above/default-above__03-still-s96.png",
+          "lum": {
+            "ok": true,
+            "meanY": 111.283585,
+            "blackFrac": 0.00022522522522522523,
+            "darkFrac": 0.00022522522522522523,
+            "brightFrac": 0.9997715572715573,
+            "topY": 115.00371,
+            "midY": 110.91132,
+            "botY": 107.935715
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 116,
+            "stats": "STILL accum 116/256 (45%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 3.2,
+            "cam": [
+              0,
+              3.2,
+              5
+            ],
+            "target": [
+              0,
+              -2.2,
+              0
+            ]
+          }
+        },
+        {
+          "name": "default-above__03-still-s128",
+          "png": "notes/GROK/validation/still-blackout-above/default-above__03-still-s128.png",
+          "lum": {
+            "ok": true,
+            "meanY": 111.15289,
+            "blackFrac": 0.0003131703131703132,
+            "darkFrac": 0.0003131703131703132,
+            "brightFrac": 0.9996857571857571,
+            "topY": 114.882416,
+            "midY": 110.77876,
+            "botY": 107.797516
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 150,
+            "stats": "STILL accum 150/256 (59%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 3.2,
+            "cam": [
+              0,
+              3.2,
+              5
+            ],
+            "target": [
+              0,
+              -2.2,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "horizon",
+      "blacked": false,
+      "ratio": 1.020689041940169,
+      "liveMean": 137.54141,
+      "lateMean": 140.38701,
+      "steps": [
+        {
+          "name": "horizon__01-live",
+          "png": "notes/GROK/validation/still-blackout-above/horizon__01-live.png",
+          "lum": {
+            "ok": true,
+            "meanY": 137.54141,
+            "blackFrac": 0.000006435006435006435,
+            "darkFrac": 0.000011797511797511798,
+            "brightFrac": 0.9994165594165594,
+            "topY": 163.30525,
+            "midY": 142.27364,
+            "botY": 107.04536
+          },
+          "meta": {
+            "mode": "live",
+            "samples": 2,
+            "stats": "LIVE path-trace · 2 spp · 1400×900 · ocean · uncheck Animate for clean accum",
+            "animate": true,
+            "underwaterView": false,
+            "camY": 1.2,
+            "cam": [
+              0,
+              1.2,
+              6
+            ],
+            "target": [
+              0,
+              0.3,
+              0
+            ]
+          }
+        },
+        {
+          "name": "horizon__02-still-t0",
+          "png": "notes/GROK/validation/still-blackout-above/horizon__02-still-t0.png",
+          "lum": {
+            "ok": true,
+            "meanY": 140.68488,
+            "blackFrac": 0.00011154011154011154,
+            "darkFrac": 0.00011154011154011154,
+            "brightFrac": 0.9998884598884599,
+            "topY": 163.30493,
+            "midY": 148.06152,
+            "botY": 110.68815
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 66,
+            "stats": "STILL accum 66/256 (26%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 1.2,
+            "cam": [
+              0,
+              1.2,
+              6
+            ],
+            "target": [
+              0,
+              0.3,
+              0
+            ]
+          }
+        },
+        {
+          "name": "horizon__03-still-s16",
+          "png": "notes/GROK/validation/still-blackout-above/horizon__03-still-s16.png",
+          "lum": {
+            "ok": true,
+            "meanY": 140.6568,
+            "blackFrac": 0.00018447018447018446,
+            "darkFrac": 0.00018447018447018446,
+            "brightFrac": 0.9998155298155298,
+            "topY": 163.30492,
+            "midY": 148.0332,
+            "botY": 110.63224
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 104,
+            "stats": "STILL accum 104/256 (41%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 1.2,
+            "cam": [
+              0,
+              1.2,
+              6
+            ],
+            "target": [
+              0,
+              0.3,
+              0
+            ]
+          }
+        },
+        {
+          "name": "horizon__03-still-s48",
+          "png": "notes/GROK/validation/still-blackout-above/horizon__03-still-s48.png",
+          "lum": {
+            "ok": true,
+            "meanY": 140.57825,
+            "blackFrac": 0.00027241527241527244,
+            "darkFrac": 0.00027241527241527244,
+            "brightFrac": 0.9997275847275847,
+            "topY": 163.30492,
+            "midY": 147.93213,
+            "botY": 110.497696
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 142,
+            "stats": "STILL accum 142/256 (55%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 1.2,
+            "cam": [
+              0,
+              1.2,
+              6
+            ],
+            "target": [
+              0,
+              0.3,
+              0
+            ]
+          }
+        },
+        {
+          "name": "horizon__03-still-s96",
+          "png": "notes/GROK/validation/still-blackout-above/horizon__03-still-s96.png",
+          "lum": {
+            "ok": true,
+            "meanY": 140.48491,
+            "blackFrac": 0.0003592878592878593,
+            "darkFrac": 0.0003592878592878593,
+            "brightFrac": 0.9996407121407122,
+            "topY": 163.30492,
+            "midY": 147.80981,
+            "botY": 110.34003
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 180,
+            "stats": "STILL accum 180/256 (70%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 1.2,
+            "cam": [
+              0,
+              1.2,
+              6
+            ],
+            "target": [
+              0,
+              0.3,
+              0
+            ]
+          }
+        },
+        {
+          "name": "horizon__03-still-s128",
+          "png": "notes/GROK/validation/still-blackout-above/horizon__03-still-s128.png",
+          "lum": {
+            "ok": true,
+            "meanY": 140.38701,
+            "blackFrac": 0.00043007293007293006,
+            "darkFrac": 0.00043007293007293006,
+            "brightFrac": 0.9995699270699271,
+            "topY": 163.30492,
+            "midY": 147.68251,
+            "botY": 110.173615
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 218,
+            "stats": "STILL accum 218/256 (85%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 1.2,
+            "cam": [
+              0,
+              1.2,
+              6
+            ],
+            "target": [
+              0,
+              0.3,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "grazing",
+      "blacked": false,
+      "ratio": 1.0231620660483978,
+      "liveMean": 144.41501,
+      "lateMean": 147.75996,
+      "steps": [
+        {
+          "name": "grazing__01-live",
+          "png": "notes/GROK/validation/still-blackout-above/grazing__01-live.png",
+          "lum": {
+            "ok": true,
+            "meanY": 144.41501,
+            "blackFrac": 0.000006435006435006435,
+            "darkFrac": 0.00001287001287001287,
+            "brightFrac": 0.9995452595452595,
+            "topY": 163.30446,
+            "midY": 152.91708,
+            "botY": 117.02351
+          },
+          "meta": {
+            "mode": "live",
+            "samples": 2,
+            "stats": "LIVE path-trace · 2 spp · 1400×900 · ocean · uncheck Animate for clean accum",
+            "animate": true,
+            "underwaterView": false,
+            "camY": 0.4,
+            "cam": [
+              0,
+              0.4,
+              8
+            ],
+            "target": [
+              0,
+              0.05,
+              0
+            ]
+          }
+        },
+        {
+          "name": "grazing__02-still-t0",
+          "png": "notes/GROK/validation/still-blackout-above/grazing__02-still-t0.png",
+          "lum": {
+            "ok": true,
+            "meanY": 147.8622,
+            "blackFrac": 0.00009545259545259545,
+            "darkFrac": 0.00009545259545259545,
+            "brightFrac": 0.9999034749034749,
+            "topY": 163.30421,
+            "midY": 156.91896,
+            "botY": 123.36345
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 48,
+            "stats": "STILL accum 48/256 (19%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 0.4,
+            "cam": [
+              0,
+              0.4,
+              8
+            ],
+            "target": [
+              0,
+              0.05,
+              0
+            ]
+          }
+        },
+        {
+          "name": "grazing__03-still-s16",
+          "png": "notes/GROK/validation/still-blackout-above/grazing__03-still-s16.png",
+          "lum": {
+            "ok": true,
+            "meanY": 147.88724,
+            "blackFrac": 0.00014157014157014156,
+            "darkFrac": 0.00014157014157014156,
+            "brightFrac": 0.9998573573573574,
+            "topY": 163.30421,
+            "midY": 156.92572,
+            "botY": 123.431786
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 68,
+            "stats": "STILL accum 68/256 (27%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 0.4,
+            "cam": [
+              0,
+              0.4,
+              8
+            ],
+            "target": [
+              0,
+              0.05,
+              0
+            ]
+          }
+        },
+        {
+          "name": "grazing__03-still-s48",
+          "png": "notes/GROK/validation/still-blackout-above/grazing__03-still-s48.png",
+          "lum": {
+            "ok": true,
+            "meanY": 147.86797,
+            "blackFrac": 0.00018768768768768769,
+            "darkFrac": 0.00018768768768768769,
+            "brightFrac": 0.9998123123123123,
+            "topY": 163.30421,
+            "midY": 156.89662,
+            "botY": 123.403114
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 90,
+            "stats": "STILL accum 90/256 (35%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 0.4,
+            "cam": [
+              0,
+              0.4,
+              8
+            ],
+            "target": [
+              0,
+              0.05,
+              0
+            ]
+          }
+        },
+        {
+          "name": "grazing__03-still-s96",
+          "png": "notes/GROK/validation/still-blackout-above/grazing__03-still-s96.png",
+          "lum": {
+            "ok": true,
+            "meanY": 147.82486,
+            "blackFrac": 0.0002531102531102531,
+            "darkFrac": 0.0002531102531102531,
+            "brightFrac": 0.9997468897468897,
+            "topY": 163.30421,
+            "midY": 156.8402,
+            "botY": 123.33017
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 118,
+            "stats": "STILL accum 118/256 (46%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 0.4,
+            "cam": [
+              0,
+              0.4,
+              8
+            ],
+            "target": [
+              0,
+              0.05,
+              0
+            ]
+          }
+        },
+        {
+          "name": "grazing__03-still-s128",
+          "png": "notes/GROK/validation/still-blackout-above/grazing__03-still-s128.png",
+          "lum": {
+            "ok": true,
+            "meanY": 147.75996,
+            "blackFrac": 0.00033462033462033463,
+            "darkFrac": 0.00033462033462033463,
+            "brightFrac": 0.9996653796653797,
+            "topY": 163.30421,
+            "midY": 156.75945,
+            "botY": 123.21624
+          },
+          "meta": {
+            "mode": "still",
+            "samples": 148,
+            "stats": "STILL accum 148/256 (58%) · 1400×900 · ocean",
+            "animate": false,
+            "underwaterView": false,
+            "camY": 0.4,
+            "cam": [
+              0,
+              0.4,
+              8
+            ],
+            "target": [
+              0,
+              0.05,
+              0
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "fatal": null
+}

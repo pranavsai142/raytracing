@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:18:21.741Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "atmosphere",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "atmosphere"
+  ],
+  "results": [
+    {
+      "chapterId": "atmosphere",
+      "section": "§155",
+      "quote": "Darkness seen through illumined vapour",
+      "goetheSaw": "Sky blue is darkness seen through thin illumined vapour; the sun through mist warms yellow→ruby.",
+      "userShouldSee": "Zenith blue deepens with denser atmosphere / low sun; sun disk warms; optional flame-edge demo when sceneMode=2.",
+      "badgeExpected": "PHYSICAL",
+      "badgeActual": "PHYSICAL",
+      "badgeOk": true,
+      "caption": "§155 — Darkness seen through illumined vapour",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/03-atmosphere.png",
+      "captureOk": true,
+      "fileBase": "03-atmosphere",
+      "status": "PASS",
+      "notes": "",
+      "visualChecklist": "Zenith blue deepens with denser atmosphere / low sun; sun disk warms; optional flame-edge demo when sceneMode=2.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

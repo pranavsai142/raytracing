@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:36:09.800Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "sun-glitter",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "sun-glitter"
+  ],
+  "results": [
+    {
+      "chapterId": "sun-glitter",
+      "section": "§93",
+      "quote": "Halo around the sun image on water",
+      "goetheSaw": "The reflected sun image on water is surrounded by a glittering halo / dazzle.",
+      "userShouldSee": "Bright sun glitter path on surface with halo-like bloom or sparkle; MIXED badge.",
+      "badgeExpected": "MIXED",
+      "badgeActual": "MIXED",
+      "badgeOk": true,
+      "caption": "§93 — Halo around the sun image on water",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/16-sun-glitter.png",
+      "captureOk": true,
+      "fileBase": "16-sun-glitter",
+      "status": "PASS",
+      "notes": "",
+      "visualChecklist": "Bright sun glitter path on surface with halo-like bloom or sparkle; MIXED badge.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

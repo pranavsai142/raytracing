@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:23:12.017Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "shadows",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "shadows"
+  ],
+  "results": [
+    {
+      "chapterId": "shadows",
+      "section": "§76",
+      "quote": "Contrary light fills the shadow",
+      "goetheSaw": "Principal light tints the surface; contrary (fill) light fills the shadow → complementary coloured shadows.",
+      "userShouldSee": "Dual-light rod/floor: two distinct coloured shadows; overlap darker/neutral; MIXED badge.",
+      "badgeExpected": "MIXED",
+      "badgeActual": "MIXED",
+      "badgeOk": true,
+      "caption": "§76 — Contrary light fills the shadow",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/04-shadows.png",
+      "captureOk": true,
+      "fileBase": "04-shadows",
+      "status": "PASS",
+      "notes": "",
+      "visualChecklist": "Dual-light rod/floor: two distinct coloured shadows; overlap darker/neutral; MIXED badge.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

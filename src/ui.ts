@@ -5,9 +5,11 @@ import {
   WAVE_AMP_MAX,
   cloneWaveComponent,
   type AbsorptionModel,
+  type FloorPresetName,
   type WaveComponent,
   type WavePreset,
 } from './PathTracer';
+import type { FlyGate } from './flyBasis';
 
 type NumKey = {
   [K in keyof PathTracer['params']]: PathTracer['params'][K] extends number ? K : never;
@@ -71,6 +73,14 @@ export function setupUI(tracer: PathTracer): void {
   bindSlider('opponent', 'opponent-val', 'opponentStrength');
   bindSlider('secondary-reflect', 'secondary-reflect-val', 'secondaryReflectWeight');
   bindSlider('floor-refl', 'floor-refl-val', 'floorReflectance');
+  bindSlider('floor-height', 'floor-height-val', 'floorHeight', 1);
+  bindSlider('floor-alb-scale', 'floor-alb-scale-val', 'floorAlbedoScale');
+  bindSlider('floor-bump-amp', 'floor-bump-amp-val', 'floorBumpAmp');
+  bindSlider('floor-bump-freq', 'floor-bump-freq-val', 'floorBumpFreq', 1);
+  bindSlider('floor-bump-octaves', 'floor-bump-octaves-val', 'floorBumpOctaves', 0);
+  bindSlider('floor-rough', 'floor-rough-val', 'floorRoughness');
+  bindSlider('floor-spec', 'floor-spec-val', 'floorSpecular');
+  bindSlider('floor-checker', 'floor-checker-val', 'floorCheckerScale', 1);
   bindSlider('flame-edge', 'flame-edge-val', 'flameEdgeBoost');
   bindSlider('moon-elev', 'moon-elev-val', 'moonElevation');
   bindSlider('moon-az', 'moon-az-val', 'moonAzimuth');
@@ -82,7 +92,7 @@ export function setupUI(tracer: PathTracer): void {
 
   const bindVec3 = (
     ids: [string, string, string],
-    key: 'scatterTint' | 'volumeTint' | 'mediumTint' | 'fillTint' | 'fillDir' | 'sigmaLambda',
+    key: 'scatterTint' | 'volumeTint' | 'mediumTint' | 'fillTint' | 'fillDir' | 'sigmaLambda' | 'floorAlbedoColor',
   ) => {
     const sync = () => {
       tracer.params[key] = [
@@ -101,6 +111,19 @@ export function setupUI(tracer: PathTracer): void {
   bindVec3(['fill-tint-r', 'fill-tint-g', 'fill-tint-b'], 'fillTint');
   bindVec3(['fill-dir-x', 'fill-dir-y', 'fill-dir-z'], 'fillDir');
   bindVec3(['sigma-r', 'sigma-g', 'sigma-b'], 'sigmaLambda');
+  bindVec3(['floor-alb-r', 'floor-alb-g', 'floor-alb-b'], 'floorAlbedoColor');
+
+  const floorPattern = document.getElementById('floor-pattern') as HTMLSelectElement;
+  floorPattern?.addEventListener('change', () => {
+    tracer.params.floorPattern = parseInt(floorPattern.value, 10);
+    tracer.markSceneChanged();
+  });
+
+  const floorMaterial = document.getElementById('floor-material') as HTMLSelectElement;
+  floorMaterial?.addEventListener('change', () => {
+    tracer.params.floorMaterial = parseInt(floorMaterial.value, 10);
+    tracer.markSceneChanged();
+  });
 
   const absorptionModel = document.getElementById('absorption-model') as HTMLSelectElement;
   absorptionModel?.addEventListener('change', () => {
@@ -109,13 +132,21 @@ export function setupUI(tracer: PathTracer): void {
   });
 
   const animateWaves = document.getElementById('animate-waves') as HTMLInputElement;
-  animateWaves?.addEventListener('change', () => {
+  const legendAnimate = document.getElementById('legend-animate') as HTMLInputElement | null;
+  const onAnimateChange = (on: boolean) => {
     // Critical: freeze freezes waves AND cube so progressive path-trace can converge.
     // LIVE mode never blends history (avoids spotty ghost caustics).
-    // setAnimateScene(false) also forces autoOrbit off — keep the button in sync.
-    tracer.setAnimateScene(animateWaves.checked);
+    tracer.setAnimateScene(on);
+    if (animateWaves) animateWaves.checked = on;
+    if (legendAnimate) legendAnimate.checked = on;
     syncAutoOrbitButton(tracer);
-  });
+    const modeEl = document.getElementById('legend-mode');
+    if (modeEl) {
+      modeEl.textContent = on ? 'LIVE path-trace' : 'STILL accumulate';
+    }
+  };
+  animateWaves?.addEventListener('change', () => onAnimateChange(animateWaves.checked));
+  legendAnimate?.addEventListener('change', () => onAnimateChange(legendAnimate.checked));
 
   const physio = document.getElementById('physio-contrast') as HTMLInputElement;
   physio?.addEventListener('change', () => {
@@ -127,6 +158,24 @@ export function setupUI(tracer: PathTracer): void {
   fixation?.addEventListener('change', () => {
     tracer.params.fixationMode = fixation.checked;
     tracer.markSceneChanged();
+  });
+
+  const floorEnabled = document.getElementById('floor-enabled') as HTMLInputElement;
+  floorEnabled?.addEventListener('change', () => {
+    tracer.params.floorEnabled = floorEnabled.checked;
+    tracer.markSceneChanged();
+  });
+
+  document.querySelectorAll('[data-floor-preset]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const name = (el as HTMLElement).dataset.floorPreset as FloorPresetName;
+      if (!name) return;
+      tracer.applyFloorPreset(name);
+      document.querySelectorAll('[data-floor-preset]').forEach((b) => {
+        b.classList.toggle('active', (b as HTMLElement).dataset.floorPreset === name);
+      });
+      applyParamsToUI(tracer);
+    });
   });
 
   const btnAbove = document.getElementById('view-above')!;
@@ -511,6 +560,14 @@ export function applyParamsToUI(tracer: PathTracer): void {
   set('opponent', p.opponentStrength, 'opponent-val');
   set('secondary-reflect', p.secondaryReflectWeight, 'secondary-reflect-val');
   set('floor-refl', p.floorReflectance, 'floor-refl-val');
+  set('floor-height', p.floorHeight, 'floor-height-val', 1);
+  set('floor-alb-scale', p.floorAlbedoScale, 'floor-alb-scale-val');
+  set('floor-bump-amp', p.floorBumpAmp, 'floor-bump-amp-val');
+  set('floor-bump-freq', p.floorBumpFreq, 'floor-bump-freq-val', 1);
+  set('floor-bump-octaves', p.floorBumpOctaves, 'floor-bump-octaves-val', 0);
+  set('floor-rough', p.floorRoughness, 'floor-rough-val');
+  set('floor-spec', p.floorSpecular, 'floor-spec-val');
+  set('floor-checker', p.floorCheckerScale, 'floor-checker-val', 1);
   set('flame-edge', p.flameEdgeBoost, 'flame-edge-val');
   set('moon-elev', p.moonElevation, 'moon-elev-val');
   set('moon-az', p.moonAzimuth, 'moon-az-val');
@@ -524,18 +581,34 @@ export function applyParamsToUI(tracer: PathTracer): void {
   setVec(['fill-tint-r', 'fill-tint-g', 'fill-tint-b'], p.fillTint);
   setVec(['fill-dir-x', 'fill-dir-y', 'fill-dir-z'], p.fillDir);
   setVec(['sigma-r', 'sigma-g', 'sigma-b'], p.sigmaLambda);
+  setVec(['floor-alb-r', 'floor-alb-g', 'floor-alb-b'], p.floorAlbedoColor);
 
   const abs = document.getElementById('absorption-model') as HTMLSelectElement | null;
   if (abs) abs.value = p.absorptionModel;
 
+  const floorPat = document.getElementById('floor-pattern') as HTMLSelectElement | null;
+  if (floorPat) floorPat.value = String(p.floorPattern);
+
+  const floorMat = document.getElementById('floor-material') as HTMLSelectElement | null;
+  if (floorMat) floorMat.value = String(p.floorMaterial);
+
   const animate = document.getElementById('animate-waves') as HTMLInputElement | null;
   if (animate) animate.checked = p.animateWaves;
+  const legendAnimate = document.getElementById('legend-animate') as HTMLInputElement | null;
+  if (legendAnimate) legendAnimate.checked = p.animateWaves;
+  const modeEl = document.getElementById('legend-mode');
+  if (modeEl) {
+    modeEl.textContent = p.animateWaves ? 'LIVE path-trace' : 'STILL accumulate';
+  }
 
   const physio = document.getElementById('physio-contrast') as HTMLInputElement | null;
   if (physio) physio.checked = p.physiologicalContrast;
 
   const fixation = document.getElementById('fixation-mode') as HTMLInputElement | null;
   if (fixation) fixation.checked = p.fixationMode;
+
+  const floorEn = document.getElementById('floor-enabled') as HTMLInputElement | null;
+  if (floorEn) floorEn.checked = p.floorEnabled;
 
   syncAutoOrbitButton(tracer);
 
@@ -549,7 +622,93 @@ export function applyParamsToUI(tracer: PathTracer): void {
 
 function exportImage(tracer: PathTracer): void {
   const link = document.createElement('a');
-  link.download = `goethe-${tracer.params.activeChapter}-${Date.now()}.png`;
+  link.download = `oceanscape-${tracer.params.activeChapter}-${Date.now()}.png`;
   link.href = tracer.exportPNG();
   link.click();
+}
+
+export type ShellUX = {
+  entered: boolean;
+  enter: () => void;
+  refreshLegendMode: () => void;
+};
+
+/**
+ * Intro overlay, control legend, mobile menu drawer.
+ * Fly gate stays disabled until enter() so cold load does not steal free-fly focus.
+ */
+export function setupShellUX(tracer: PathTracer, flyGate: FlyGate): ShellUX {
+  const overlay = document.getElementById('intro-overlay');
+  const enterBtn = document.getElementById('enter-oceanscape');
+  const legend = document.getElementById('controls-legend');
+  const menuBtn = document.getElementById('menu-toggle');
+  const ui = document.getElementById('ui');
+  let entered = false;
+
+  const refreshLegendMode = () => {
+    const modeEl = document.getElementById('legend-mode');
+    if (modeEl) {
+      modeEl.textContent = tracer.params.animateWaves ? 'LIVE path-trace' : 'STILL accumulate';
+    }
+    const legendAnimate = document.getElementById('legend-animate') as HTMLInputElement | null;
+    if (legendAnimate) legendAnimate.checked = tracer.params.animateWaves;
+    const panelAnimate = document.getElementById('animate-waves') as HTMLInputElement | null;
+    if (panelAnimate) panelAnimate.checked = tracer.params.animateWaves;
+  };
+
+  const setMenuOpen = (open: boolean) => {
+    ui?.classList.toggle('ui-open', open);
+    menuBtn?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (menuBtn) menuBtn.textContent = open ? 'Close' : 'Menu';
+    document.body.classList.toggle('menu-open', open);
+  };
+
+  menuBtn?.addEventListener('click', () => {
+    const open = !ui?.classList.contains('ui-open');
+    setMenuOpen(open);
+  });
+
+  // Tap outside panel on mobile closes drawer
+  document.addEventListener('pointerdown', (e) => {
+    if (!ui?.classList.contains('ui-open')) return;
+    const t = e.target as Node;
+    if (ui.contains(t) || menuBtn?.contains(t)) return;
+    if (window.matchMedia('(max-width: 720px)').matches) setMenuOpen(false);
+  });
+
+  const enter = () => {
+    if (entered) return;
+    entered = true;
+    flyGate.enabled = true;
+    overlay?.classList.add('intro-hidden');
+    overlay?.setAttribute('aria-hidden', 'true');
+    if (legend) legend.hidden = false;
+    // STILL hero already accumulating under the dimmed intro — keep freeze
+    if (!tracer.params.animateWaves) {
+      tracer.freezeForCapture();
+    }
+    refreshLegendMode();
+    applyParamsToUI(tracer);
+    const stats = document.getElementById('stats');
+    if (stats) stats.textContent = tracer.getStats();
+  };
+
+  enterBtn?.addEventListener('click', () => enter());
+  window.addEventListener('keydown', (e) => {
+    if (entered) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      enter();
+    }
+  });
+
+  refreshLegendMode();
+  const shell: ShellUX = {
+    get entered() {
+      return entered;
+    },
+    enter,
+    refreshLegendMode,
+  };
+  return shell;
 }

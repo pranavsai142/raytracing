@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:42:11.326Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "wave-contrast",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "wave-contrast"
+  ],
+  "results": [
+    {
+      "chapterId": "wave-contrast",
+      "section": "§57",
+      "quote": "Lit side green; shadow opposite",
+      "goetheSaw": "On an agitated sea, lit faces and shadow sides show strong contrast (green-tending lit, opposite in shadow).",
+      "userShouldSee": "Waves with clear lit/shadow contrast across slopes; MIXED badge.",
+      "badgeExpected": "MIXED",
+      "badgeActual": "MIXED",
+      "badgeOk": true,
+      "caption": "§57 — Lit side green; shadow opposite",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/14-wave-contrast.png",
+      "captureOk": true,
+      "fileBase": "14-wave-contrast",
+      "status": "PASS",
+      "notes": "",
+      "visualChecklist": "Waves with clear lit/shadow contrast across slopes; MIXED badge.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}

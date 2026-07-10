@@ -8,10 +8,14 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "deploy": "npm run build && npx gh-pages -d dist",
+    "test:strafe": "node scripts/test-strafe.mjs",
     "smoke": "BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/visual-smoke.mjs",
     "smoke:headed": "HEADED=1 BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/visual-smoke.mjs",
+    "repro:still-blackout": "BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/repro-still-blackout.mjs",
+    "repro:still-blackout:headed": "HEADED=1 BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/repro-still-blackout.mjs",
     "smoke:goethe": "BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/goethe-smoke.mjs",
-    "smoke:goethe:headed": "HEADED=1 BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/goethe-smoke.mjs"
+    "smoke:goethe:headed": "HEADED=1 BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/goethe-smoke.mjs",
+    "smoke:goethe:one": "BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} SKIP_HASH=1 SAMPLES=${SAMPLES:-64} RENDER_SCALE=${RENDER_SCALE:-1} SPP=${SPP:-2} node scripts/goethe-smoke.mjs"
   },
   "dependencies": {
     "three": "^0.170.0"

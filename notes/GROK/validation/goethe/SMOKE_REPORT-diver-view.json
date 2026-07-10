@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-07-09T18:32:30.789Z",
+  "baseUrl": "http://127.0.0.1:5173/raytracing/",
+  "samplesTarget": 64,
+  "renderScale": 1,
+  "spp": 2,
+  "chapterOnly": "diver-view",
+  "purpose": "Goethe Theory of Colours chapter smoke — structural + observation matrix against book §§",
+  "expectedChapters": [
+    "diver-view"
+  ],
+  "results": [
+    {
+      "chapterId": "diver-view",
+      "section": "§78",
+      "quote": "Everything seen in red light; shadows green",
+      "goetheSaw": "Underwater diver perspective: red-biased illumination field with green-tending shadows (§78).",
+      "userShouldSee": "Underwater cube; beer-style absorption; red/green relations; MIXED badge.",
+      "badgeExpected": "MIXED",
+      "badgeActual": "MIXED",
+      "badgeOk": true,
+      "caption": "§78 — Everything seen in red light; shadows green",
+      "samples": 64,
+      "mode": "still",
+      "samplesOk": true,
+      "capturePath": "notes/GROK/validation/goethe/12-diver-view.png",
+      "captureOk": true,
+      "fileBase": "12-diver-view",
+      "status": "PASS",
+      "notes": "",
+      "visualChecklist": "Underwater cube; beer-style absorption; red/green relations; MIXED badge.",
+      "errors": []
+    }
+  ],
+  "hashCheck": null,
+  "fatal": null,
+  "pass": true,
+  "summary": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "badgeFailures": [],
+    "hashOk": null
+  }
+}
