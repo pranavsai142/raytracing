@@ -1,0 +1,15 @@
+PASS: intro-overlay in index.html
+PASS: enter button in index.html
+PASS: Enter Oceanscape copy
+PASS: enterOceanscape on API
+PASS: __oceanscape window API
+PASS: fly gated until enter
+PASS: shell UX wires intro
+PASS: default STILL (animateWaves false)
+PASS: default ocean hero chapter
+PASS: vite BASE_PATH override
+PASS: render.yaml static + build:render/BASE_PATH + dist
+PASS: render.yaml must not set NODE_ENV=production (npm ci keeps devDeps)
+PASS: Pages CI npm ci/build → dist
+PASS: path tracer fragment present (ship physics shader)
+OVERALL PASS

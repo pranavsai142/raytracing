@@ -1,0 +1,73 @@
+# render.yaml — Blueprint IaC. Used only when deploying via New → Blueprint.
+# Manual Web Service / Static Site: copy buildCommand / staticPublishPath /
+# routes into the dashboard; Blueprint is ignored for services created only
+# as "Static Site" or "Web Service" without Blueprint sync.
+# Spec: https://render.com/docs/blueprint-spec
+#
+# Stack: Vite + TypeScript + Three.js static SPA (Oceanscape Web)
+# Existing Pages deploy: push main → .github/workflows/deploy.yml (base /raytracing/)
+# This Blueprint: root URL on *.onrender.com (BASE_PATH=/ at build time)
+#
+# Operator checklist:
+#   1. Dashboard → New → Blueprint → connect this repo (branch: main)
+#   2. Confirm service name oceanscape-web; plan free (or upgrade)
+#   3. No Secret Files required (client-only sim; no API keys)
+#   4. Deploy → open https://<service>.onrender.com/
+#   5. Live smoke: intro → Enter → STILL ocean hero; Animate for LIVE; #chapter=ocean
+#   6. Optional: attach custom domains[] below after DNS is ready
+#
+# Scaling: static sites are CDN-backed and diskless (no persistent disk).
+# Multi-instance web scaling does not apply; no attached disk needed.
+# Auto-deploy: commit to linked branch deploys (autoDeployTrigger: commit).
+
+services:
+  - type: web
+    name: oceanscape-web
+    runtime: static
+    plan: free
+    branch: main
+    autoDeployTrigger: commit
+    # Install + build only (no long-running process in build).
+    # Same as package.json "build:render" → root asset URLs (not /raytracing/).
+    buildCommand: npm ci && npm run build:render
+    staticPublishPath: ./dist
+    # Hash routing (#chapter=…) works without rewrites; SPA fallback is still
+    # correct if the app later uses path-based client routes.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      # Hashed Vite assets can be cached hard; index stays revalidate.
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+    envVars:
+      # Pin Node only. Do NOT set NODE_ENV=production here: Render injects
+      # envVars into the build, and npm ci would omit devDependencies
+      # (vite, typescript) so `npm run build:render` would fail.
+      - key: NODE_VERSION
+        value: "22"
+
+# -----------------------------------------------------------------------------
+# Dashboard fallback (if you create a Static Site WITHOUT Blueprint):
+#   Build Command:      npm ci && npm run build:render
+#   Publish Directory:  dist
+#   Node version:       22 (package.json engines.node >=22)
+#   Do not set NODE_ENV=production on the service (breaks npm ci → no vite/tsc).
+#   Rewrite:            /* → /index.html
+#
+# Node Web Service alternative (if you need healthCheckPath / $PORT process):
+#   runtime:            node
+#   plan:               starter
+#   buildCommand:       npm ci && npm run build:render
+#   startCommand:       npx --yes serve -s dist -l tcp://0.0.0.0:$PORT
+#   healthCheckPath:    /
+#   (Add serve as a dependency, or keep npx; process must stay FOREGROUND.)
+#
+# Local gates before Blueprint: npm run test:ship-static && npm run test:strafe
+#   && npm run test:build-bases
+# -----------------------------------------------------------------------------

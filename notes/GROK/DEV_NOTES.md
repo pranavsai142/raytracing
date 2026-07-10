@@ -9,36 +9,40 @@ The real work is driven by:
 
 ## Current Big Picture
 
-**North-star visual contract is fixed locally** (2026-07-09). Production ship still a gate.
+**Production first-run UX + seafloor/waterline train landed** (2026-07-09). Next gate is **push + live Pages verify**.
 
-- **LIVE** / **STILL** path-trace contract; cameras on cube; hero Snell still.
-- Smoke: `npm run smoke` → `notes/GROK/validation/northstar/`.
-- **Underwater white bar (P0):** fixed in seafloor/waterline train (parametric floor + miss→sky leak closed when present).
-- **Seafloor train landed:** `floorHeight` / pattern / albedo / bump / material UI + chapter floor bundles + Abyss/Sand/Gravel/White/Mirror/Split presets. Floor is substrate; water colour from physics.
+- Cold load: **Enter Oceanscape** intro → free-fly gated; underlay is STILL ocean hero.
+- Default: `animateWaves: false` (STILL accumulate); Controls open; other panels collapsed.
+- Fly: shared yaw/pitch (drag + WASD); A/D via `src/flyBasis.ts` (left/right of look).
+- Seafloor: parametric height/bump/pattern/material + presets; substrate only.
+- Water path: heightfield march + normal-offset dielectric spawn (no sky-while-underwater fudge).
+- Smoke: `npm run smoke` (auto-enters intro); `npm run test:strafe`.
 
 **Canonical next docs:**  
-`2026-07-09-underwater-whitebar-seafloor-handoff.md` (+ research sibling)  
-`2026-07-09-northstar-visual-deploy-handoff.md` (ship)
+`2026-07-09-production-ux-physics-handoff.md`  
+`2026-07-09-northstar-visual-deploy-handoff.md` (ship checklist)
 
 ## Hard-Won Lessons
 
 1. Never blend path-trace samples across changing waves/cube.
 2. Cube must be in frame or “physics” looks broken.
 3. Snell window needs FOV past critical angle to show dark TIR ring.
-4. Physics demo ships before full Goethe REQ matrix.
+4. False water miss / self-hit → STILL black streaks; fix geometry/medium, not paint.
+5. One yaw for look + strafe or drag→WASD snaps.
+6. Physics demo ships before full Goethe REQ matrix.
 
 ## How We Work
 
-- `/init` · `/done` · `npm run build` · `npm run dev` · `npm run smoke` · push → Actions Pages
-- API: `window.__oceanscape`
+- `/init` · `/done` · `npm run build` · `npm run dev` · `npm run smoke` · `npm run test:strafe` · push → Actions Pages
+- API: `window.__oceanscape` (`entered`, `enterOceanscape`, freeze/animate, chapters)
 - Live URL target: https://pranavsai142.github.io/raytracing/
 
 ## Next Focus
 
-1. **Seafloor train landed** (Slices A–D) — white bar fix, parametric floor, materials/patterns/UI, chapter bundles + presets. Optional floor caustics (P2) still skippable.
-2. **PR-A/B** — production ship of north-star visual (if not already live).
-3. **PR-C** — Snell button, mode badge, freeze key.
-4. Goethe matrix completeness / polish now that waterline + floor are honest.
+1. Commit dirty `pathTracer.frag.glsl` if still uncommitted; push `main`.
+2. Live checklist on Pages (intro → Enter → STILL → LIVE; A/D; mobile Menu).
+3. Optional PR-C: Snell button, mode badge, freeze key.
+4. Optional P2: floor reverse-NEE caustics; Goethe completeness.
 
 ---
 

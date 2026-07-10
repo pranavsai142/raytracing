@@ -12,7 +12,7 @@ This is a **simulation project**, not an artistic ocean renderer. Phenomena (Sne
 
 Deliver a **deployed**, interactive Three.js path tracer that demonstrates physically correct light transport at the water interface with the rotating cube as validation geometry.
 
-**Immediate gate (2026-07-09):** production ship of the LIVE/STILL visual contract + Snell/TIR hero proof. See `notes/GROK/handoffs/2026-07-09-northstar-visual-deploy-handoff.md` and the production design alongside it.
+**Immediate gate:** production **deploy** of first-run UX (intro → STILL ocean hero) + honest LIVE/STILL interface physics. See latest handoff `2026-07-09-production-ux-physics-handoff.md` and `2026-07-09-northstar-visual-deploy-handoff.md`.
 
 ## Operating Philosophy
 

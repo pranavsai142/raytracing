@@ -176,12 +176,12 @@ bool isInWaterAt(vec3 p) {
   return p.y < waveHeight(p.xz, time);
 }
 
-// Heightfield surface: f(t) = (ro+rd*t).y - H((ro+rd*t).xz) = 0.
-// 1) Sign-change march + bisection (robust for multi-crest).
-// 2) Newton projection fallback (guarantees a root when origin is below/above
-//    and the ray aims at the surface — kills false misses → black samples).
+// Heightfield surface: solve f(t) = (ro+rd*t).y - H((ro+rd*t).xz) = 0.
+// March the Y-slab that can contain the surface, refine first sign-change by
+// bisection. No residual soft-accept, no force-hit — only real roots.
+// (False miss ⇒ black bulk underwater; false hit ⇒ self-intersect streaks.)
 bool intersectWaterSurface(vec3 ro, vec3 rd, out float t, out vec3 hitN, out vec2 hitXZ) {
-  const float ampBound = 0.28; // ≥ WAVE_TOTAL_AMP_BUDGET + margin
+  const float ampBound = 0.25; // ≥ WAVE_TOTAL_AMP_BUDGET
   const float tMin = 1e-3;
   const float tMax = 200.0;
   t = -1.0;
@@ -191,28 +191,20 @@ bool intersectWaterSurface(vec3 ro, vec3 rd, out float t, out vec3 hitN, out vec
   float tLo;
   float tHi;
   if (abs(rd.y) < 1e-5) {
-    // Near-horizontal: march a long segment; surface may still be crossed via slope
+    // Horizontal: stay in slab only if already near surface height
+    if (abs(ro.y) > ampBound + 0.05) return false;
     tLo = tMin;
-    tHi = min(tMax, 100.0);
+    tHi = min(tMax, 80.0);
   } else {
-    // Expand slab so deep underwater cameras still bracket y≈0 surface
-    float yLo = min(-ampBound, ro.y - 0.5);
-    float yHi = max(ampBound, ro.y + 0.5);
-    // Always include mean-surface band
-    yLo = min(yLo, -ampBound);
-    yHi = max(yHi, ampBound);
-    float ta = (yLo - ro.y) / rd.y;
-    float tb = (yHi - ro.y) / rd.y;
+    float ta = (-ampBound - ro.y) / rd.y;
+    float tb = (ampBound - ro.y) / rd.y;
     tLo = max(tMin, min(ta, tb));
     tHi = min(tMax, max(ta, tb));
-    if (tLo > tHi) {
-      // Ray points away from the vertical slab — still try Newton from plane seed
-      tLo = tMin;
-      tHi = tMax;
-    }
+    if (tLo > tHi) return false;
   }
 
-  const int STEPS = 64;
+  // Dense march so multi-crest waves still produce a sign change per cell
+  const int STEPS = 48;
   float dt = (tHi - tLo) / float(STEPS);
   float tPrev = tLo;
   float fPrev = (ro.y + rd.y * tPrev) - waveHeight((ro + rd * tPrev).xz, time);
@@ -221,7 +213,7 @@ bool intersectWaterSurface(vec3 ro, vec3 rd, out float t, out vec3 hitN, out vec
     float tCurr = (i == STEPS) ? tHi : (tLo + float(i) * dt);
     float fCurr = (ro.y + rd.y * tCurr) - waveHeight((ro + rd * tCurr).xz, time);
 
-    if (fPrev * fCurr <= 0.0 && (abs(fPrev) + abs(fCurr)) > 1e-8) {
+    if (fPrev * fCurr <= 0.0 && (abs(fPrev) + abs(fCurr)) > 0.0) {
       float a = tPrev;
       float b = tCurr;
       float fa = fPrev;
@@ -236,43 +228,14 @@ bool intersectWaterSurface(vec3 ro, vec3 rd, out float t, out vec3 hitN, out vec
         }
       }
       t = 0.5 * (a + b);
-      if (t >= tMin && t <= tMax) {
-        hitXZ = (ro + rd * t).xz;
-        hitN = waveNormal(hitXZ, time);
-        return true;
-      }
+      if (t < tMin || t > tMax) return false;
+      hitXZ = (ro + rd * t).xz;
+      // Snap point to heightfield so dielectric math sees consistent geometry
+      hitN = waveNormal(hitXZ, time);
+      return true;
     }
     tPrev = tCurr;
     fPrev = fCurr;
-  }
-
-  // Newton fallback: classic Oceanscape projection (always returns a candidate).
-  // Accept only when residual is small — avoids inventing hits behind the ray.
-  if (abs(rd.y) < 1e-5) return false;
-  t = (-ro.y) / rd.y;
-  if (t < tMin || t > tMax) return false;
-  for (int i = 0; i < 8; i++) {
-    vec3 p = ro + rd * t;
-    hitXZ = p.xz;
-    float h = waveHeight(hitXZ, time);
-    vec2 dH = waveDeriv(hitXZ, time);
-    float f = p.y - h;
-    float dfdt = rd.y - (dH.x * rd.x + dH.y * rd.z);
-    if (abs(dfdt) < 1e-6) break;
-    float tNew = t - f / dfdt;
-    if (tNew < tMin || tNew > tMax) break;
-    if (abs(tNew - t) < 1e-4) {
-      t = tNew;
-      break;
-    }
-    t = tNew;
-  }
-  hitXZ = (ro + rd * t).xz;
-  float hN = waveHeight(hitXZ, time);
-  float resid = abs((ro.y + rd.y * t) - hN);
-  if (t >= tMin && t <= tMax && resid < 0.06) {
-    hitN = waveNormal(hitXZ, time);
-    return true;
   }
   return false;
 }
@@ -630,10 +593,12 @@ vec3 envLight(vec3 dir, float lambdaNm) {
   return (sky + vec3(3.5, 3.2, 2.8) * sun + vec3(2.8, 2.6, 2.2) * moon) * spectrumWeight(lambdaNm);
 }
 
-// Residual in-scatter if a path truly cannot hit surface/floor (should be rare
-// after domain closure). Never sample air sky here — medium leak / white bar.
+// Path ends in water with no geometry hit. Physical limit: only residual
+// multiple-scatter from the medium — NEVER air sky (that is a medium leak).
+// Real sky only after a successful water→air transmit sets inWater=false.
 vec3 underwaterMissRadiance(vec3 dir, float lambdaNm) {
-  return scatterTint * volumeTint * spectrumWeight(lambdaNm) * 0.04;
+  // Isotropic residual in-scatter (path already volume-attenuated on prior legs)
+  return scatterTint * volumeTint * spectrumWeight(lambdaNm) * 0.015;
 }
 
 vec3 cubeTexture(vec3 localP, vec3 localN) {
@@ -708,43 +673,12 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
     HitInfo hit = traceScene(ray);
     vec2 ru = rand2(seed + float(bounce) * 17.0);
 
-    // —— Domain closure (production): infinite ocean = surface + optional floor.
-    // Underwater rays that "miss" are almost always a false miss (intersection
-    // failure or near-horizontal path). Those used to terminate with near-black
-    // residual → speckles / black spots that pop each sample in LIVE/early STILL.
-    // Close the domain instead of inventing sky underwater.
-    if (!hit.hit && inWater) {
-      if (ray.direction.y > 1e-4) {
-        // Going up: must meet the free surface
-        float tS;
-        vec3 nS;
-        vec2 xzS;
-        if (intersectWaterSurface(ray.origin, ray.direction, tS, nS, xzS) && tS > 0.001) {
-          hit.hit = true;
-          hit.dist = tS;
-          hit.point = vec3(xzS.x, waveHeight(xzS, time), xzS.y);
-          hit.normal = nS;
-          hit.material = 0;
-        }
-      } else if (floorEnabled > 0.5 && ray.direction.y < -1e-4) {
-        // Going down: must meet the seafloor plane
-        float tF = (floorHeight - ray.origin.y) / ray.direction.y;
-        if (tF > 0.001 && tF < 200.0) {
-          hit.hit = true;
-          hit.dist = tF;
-          hit.point = ray.origin + ray.direction * tF;
-          hit.normal = vec3(0.0, 1.0, 0.0);
-          hit.material = 2;
-        }
-      }
-    }
-
     // Travel segment through water: Beer attenuation (physical path length)
     if (inWater && hit.hit) {
       throughput *= volumeAttenuation(hit.dist, lambdaNm);
     } else if (inWater && !hit.hit) {
-      // Near-horizontal residual only (should be uncommon after closure)
-      throughput *= volumeAttenuation(12.0, lambdaNm);
+      // Long free path in water before "infinity"
+      throughput *= volumeAttenuation(40.0, lambdaNm);
     }
 
     if (!hit.hit) {
@@ -937,26 +871,13 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
     if (!chooseReflect) inWater = !fromInside;
 
     // Dielectric spawn: offset along geometric normal into the medium we enter.
-    // waveNormal points to air (+). Snap so heightfield side matches intent
-    // (tilted N + eps can land in a trough/air pocket → medium desync → black path).
+    // waveNormal points to air (+). Air side = +N, water side = -N.
+    // Reflect air → air (+N); reflect water → water (-N);
+    // Transmit air→water → water (-N); transmit water→air → air (+N).
     bool enterAir = chooseReflect ? !fromInside : fromInside;
-    float eps = 0.003;
-    vec3 spawnPos = hit.point + N * (enterAir ? eps : -eps);
-    for (int k = 0; k < 5; k++) {
-      bool below = isInWaterAt(spawnPos);
-      if (enterAir && !below) break;
-      if (!enterAir && below) break;
-      spawnPos += N * (enterAir ? eps : -eps);
-    }
-    // Prefer geometric side of the free surface after snap
-    inWater = isInWaterAt(spawnPos);
-    if (enterAir && inWater) {
-      spawnPos += N * (eps * 3.0);
-      inWater = false;
-    } else if (!enterAir && !inWater) {
-      spawnPos -= N * (eps * 3.0);
-      inWater = true;
-    }
+    float eps = 0.002;
+    vec3 surfP = hit.point;
+    vec3 spawnPos = surfP + N * (enterAir ? eps : -eps);
 
     ray.origin = spawnPos;
     ray.direction = nextDir;
@@ -967,15 +888,15 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
       float legLen = 4.0;
       if (volumeScatterLeg(ray, legLen, lambdaNm, seed, bounce, throughput, accum, volRay)) {
         ray = volRay;
-        inWater = isInWaterAt(ray.origin);
+        // Scatter stays in water medium
+        inWater = true;
       }
     }
 
-    // Russian roulette after a few bounces — keep q floor higher so we don't
-    // kill barely-alive underwater paths into pure black samples as often.
-    if (bounce >= 4) {
+    // Russian roulette after a few bounces (deeper trapped paths)
+    if (bounce >= 3) {
       float lum = max(throughput.r, max(throughput.g, throughput.b));
-      float q = clamp(lum, 0.15, 0.95);
+      float q = clamp(lum, 0.05, 0.95);
       if (hash3(vec3(seed, float(bounce + 99))) > q) break;
       throughput /= q;
     }
@@ -1062,12 +983,7 @@ void main() {
     Ray primary;
     primary.origin = cameraPos;
     primary.direction = rd;
-    vec3 sampleCol = pathTrace(primary, pixel + jitter + float(s), lambdaNm);
-    // Soft firefly clamp (production path tracers): kill rare huge spikes that
-    // make neighboring near-black samples look like "popping" holes in LIVE.
-    float peak = max(sampleCol.r, max(sampleCol.g, sampleCol.b));
-    if (peak > 8.0) sampleCol *= 8.0 / peak;
-    color += sampleCol;
+    color += pathTrace(primary, pixel + jitter + float(s), lambdaNm);
   }
   color /= max(float(spp), 1.0);
 

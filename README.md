@@ -47,7 +47,9 @@ Env for smoke: `SAMPLES=64`, `HEADED=1`, `BASE_URL=http://127.0.0.1:5173/raytrac
 
 ## Deploy
 
-Canonical: **push to `main`** → GitHub Actions (`.github/workflows/deploy.yml`) → Pages.
+### GitHub Pages (existing)
+
+Canonical for the `/raytracing/` URL: **push to `main`** → GitHub Actions (`.github/workflows/deploy.yml`) → Pages.
 
 ```bash
 npm run build
@@ -55,7 +57,29 @@ npm run build
 npm run deploy       # gh-pages -d dist
 ```
 
-Base path: `/raytracing/`.
+Base path: `/raytracing/` (default `BASE_PATH`).
+
+**Live (Pages):** https://pranavsai142.github.io/raytracing/
+
+### Render (production Blueprint)
+
+IaC: root `render.yaml` (Blueprint only — ignored if you create a service solely as “Static Site” / “Web Service” in the dashboard).
+
+```bash
+# Local production-shaped build (root base, like Render):
+BASE_PATH=/ npm run build
+npx vite preview   # or: npx serve -s dist
+```
+
+Operator path:
+
+1. Render Dashboard → **New → Blueprint** → connect this repo (`main`)
+2. Service `oceanscape-web` (static, publish `dist`, `BASE_PATH=/` in build)
+3. No Secret Files required
+4. Deploy → open `https://<service>.onrender.com/`
+5. Smoke: intro → Enter → STILL hero; Animate for LIVE; `#chapter=ocean`
+
+See comments in `render.yaml` for dashboard-only fallback and optional Node+`serve` form.
 
 ## Controls (quick)
 
