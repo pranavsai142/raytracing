@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "deploy": "npm run build && npx gh-pages -d dist",
     "test:strafe": "node scripts/test-strafe.mjs",
+    "test:above-still": "BASE_URL=${BASE_URL:-http://127.0.0.1:5173/raytracing/} node scripts/test-above-still.mjs",
     "test:build-bases": "node scripts/test-build-bases.mjs",
     "test:ship-static": "node scripts/test-ship-static.mjs",
     "test:prod-ux": "node scripts/test-production-ux.mjs",

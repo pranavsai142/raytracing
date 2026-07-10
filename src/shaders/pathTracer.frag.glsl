@@ -176,35 +176,92 @@ bool isInWaterAt(vec3 p) {
   return p.y < waveHeight(p.xz, time);
 }
 
-// Heightfield surface: solve f(t) = (ro+rd*t).y - H((ro+rd*t).xz) = 0.
-// March the Y-slab that can contain the surface, refine first sign-change by
-// bisection. No residual soft-accept, no force-hit — only real roots.
-// (False miss ⇒ black bulk underwater; false hit ⇒ self-intersect streaks.)
+// ─── ROOT CAUSE of “STILL / Animate-off goes black” (esp. Above Water) ───
+// Water is an *open heightfield*, not a closed mesh. A path that enters water
+// (air→water refract) then fails to re-hit surface/floor is still marked
+// inWater and contributes underwaterMissRadiance (~near black).
+// LIVE hides this: each frame is a noisy independent sample; occasional hits
+// look “alive.” STILL progressive 1/N *averages* many black-miss samples →
+// solid black. Fix = reliable surface hits + domain closure (never leave a
+// underwater ray with nowhere to go). Not exposure, not a paint fudge.
+//
+// f(t) = (ro+rd*t).y − H((ro+rd*t).xz) = 0
+// 1) Classic Oceanscape Newton first (years of above-water reliability).
+// 2) Sign-change march for multi-crest / grazing.
+// 3) Accept Newton if residual is modest (heightfield is low-frequency vs t).
 bool intersectWaterSurface(vec3 ro, vec3 rd, out float t, out vec3 hitN, out vec2 hitXZ) {
-  const float ampBound = 0.25; // ≥ WAVE_TOTAL_AMP_BUDGET
+  const float ampBound = 0.28; // ≥ WAVE_TOTAL_AMP_BUDGET + margin
   const float tMin = 1e-3;
   const float tMax = 200.0;
   t = -1.0;
   hitXZ = ro.xz;
   hitN = vec3(0.0, 1.0, 0.0);
 
+  // —— 1) Classic Oceanscape: seed mean plane y=0, refine with wave height ——
+  // This is the path that made above-water look correct before over-strict
+  // “sign-change only” intersection started false-missing.
+  if (abs(rd.y) >= 1e-5) {
+    t = (-ro.y) / rd.y;
+    if (t >= tMin && t <= tMax) {
+      bool ok = true;
+      for (int i = 0; i < 6; i++) {
+        vec3 p = ro + rd * t;
+        hitXZ = p.xz;
+        float h = waveHeight(hitXZ, time);
+        float tNew = (h - ro.y) / rd.y;
+        if (tNew < tMin || tNew > tMax) {
+          ok = false;
+          break;
+        }
+        // Analytic Newton step when slope is available (faster convergence)
+        vec2 dH = waveDeriv(hitXZ, time);
+        float f = p.y - h;
+        float dfdt = rd.y - (dH.x * rd.x + dH.y * rd.z);
+        if (abs(dfdt) > 1e-6) {
+          float tN = t - f / dfdt;
+          if (tN >= tMin && tN <= tMax) tNew = tN;
+        }
+        if (abs(tNew - t) < 1e-4) {
+          t = tNew;
+          break;
+        }
+        t = tNew;
+      }
+      if (ok && t >= tMin && t <= tMax) {
+        hitXZ = (ro + rd * t).xz;
+        float hN = waveHeight(hitXZ, time);
+        float resid = abs((ro.y + rd.y * t) - hN);
+        // Waves are smooth at our amp budget; modest residual is a real hit.
+        if (resid < 0.12) {
+          hitN = waveNormal(hitXZ, time);
+          return true;
+        }
+      }
+    }
+  }
+
+  // —— 2) Sign-change march (grazing / multi-crest / Newton miss) ——
   float tLo;
   float tHi;
   if (abs(rd.y) < 1e-5) {
-    // Horizontal: stay in slab only if already near surface height
-    if (abs(ro.y) > ampBound + 0.05) return false;
     tLo = tMin;
-    tHi = min(tMax, 80.0);
+    tHi = min(tMax, 100.0);
   } else {
-    float ta = (-ampBound - ro.y) / rd.y;
-    float tb = (ampBound - ro.y) / rd.y;
+    float yLo = min(-ampBound, ro.y - 0.5);
+    float yHi = max(ampBound, ro.y + 0.5);
+    yLo = min(yLo, -ampBound);
+    yHi = max(yHi, ampBound);
+    float ta = (yLo - ro.y) / rd.y;
+    float tb = (yHi - ro.y) / rd.y;
     tLo = max(tMin, min(ta, tb));
     tHi = min(tMax, max(ta, tb));
-    if (tLo > tHi) return false;
+    if (tLo > tHi) {
+      tLo = tMin;
+      tHi = tMax;
+    }
   }
 
-  // Dense march so multi-crest waves still produce a sign change per cell
-  const int STEPS = 48;
+  const int STEPS = 64;
   float dt = (tHi - tLo) / float(STEPS);
   float tPrev = tLo;
   float fPrev = (ro.y + rd.y * tPrev) - waveHeight((ro + rd * tPrev).xz, time);
@@ -213,7 +270,7 @@ bool intersectWaterSurface(vec3 ro, vec3 rd, out float t, out vec3 hitN, out vec
     float tCurr = (i == STEPS) ? tHi : (tLo + float(i) * dt);
     float fCurr = (ro.y + rd.y * tCurr) - waveHeight((ro + rd * tCurr).xz, time);
 
-    if (fPrev * fCurr <= 0.0 && (abs(fPrev) + abs(fCurr)) > 0.0) {
+    if (fPrev * fCurr <= 0.0 && (abs(fPrev) + abs(fCurr)) > 1e-8) {
       float a = tPrev;
       float b = tCurr;
       float fa = fPrev;
@@ -228,15 +285,16 @@ bool intersectWaterSurface(vec3 ro, vec3 rd, out float t, out vec3 hitN, out vec
         }
       }
       t = 0.5 * (a + b);
-      if (t < tMin || t > tMax) return false;
-      hitXZ = (ro + rd * t).xz;
-      // Snap point to heightfield so dielectric math sees consistent geometry
-      hitN = waveNormal(hitXZ, time);
-      return true;
+      if (t >= tMin && t <= tMax) {
+        hitXZ = (ro + rd * t).xz;
+        hitN = waveNormal(hitXZ, time);
+        return true;
+      }
     }
     tPrev = tCurr;
     fPrev = fCurr;
   }
+
   return false;
 }
 
@@ -593,12 +651,10 @@ vec3 envLight(vec3 dir, float lambdaNm) {
   return (sky + vec3(3.5, 3.2, 2.8) * sun + vec3(2.8, 2.6, 2.2) * moon) * spectrumWeight(lambdaNm);
 }
 
-// Path ends in water with no geometry hit. Physical limit: only residual
-// multiple-scatter from the medium — NEVER air sky (that is a medium leak).
-// Real sky only after a successful water→air transmit sets inWater=false.
+// Residual in-scatter if a path truly cannot hit surface/floor (should be rare
+// after domain closure). Never sample air sky here — medium leak / white bar.
 vec3 underwaterMissRadiance(vec3 dir, float lambdaNm) {
-  // Isotropic residual in-scatter (path already volume-attenuated on prior legs)
-  return scatterTint * volumeTint * spectrumWeight(lambdaNm) * 0.015;
+  return scatterTint * volumeTint * spectrumWeight(lambdaNm) * 0.04;
 }
 
 vec3 cubeTexture(vec3 localP, vec3 localN) {
@@ -673,12 +729,43 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
     HitInfo hit = traceScene(ray);
     vec2 ru = rand2(seed + float(bounce) * 17.0);
 
+    // —— Domain closure (production): infinite ocean = surface + optional floor.
+    // Underwater rays that "miss" are almost always a false miss (intersection
+    // failure or near-horizontal path). Those used to terminate with near-black
+    // residual → speckles / black spots that pop each sample in LIVE/early STILL.
+    // Close the domain instead of inventing sky underwater.
+    if (!hit.hit && inWater) {
+      if (ray.direction.y > 1e-4) {
+        // Going up: must meet the free surface
+        float tS;
+        vec3 nS;
+        vec2 xzS;
+        if (intersectWaterSurface(ray.origin, ray.direction, tS, nS, xzS) && tS > 0.001) {
+          hit.hit = true;
+          hit.dist = tS;
+          hit.point = vec3(xzS.x, waveHeight(xzS, time), xzS.y);
+          hit.normal = nS;
+          hit.material = 0;
+        }
+      } else if (floorEnabled > 0.5 && ray.direction.y < -1e-4) {
+        // Going down: must meet the seafloor plane
+        float tF = (floorHeight - ray.origin.y) / ray.direction.y;
+        if (tF > 0.001 && tF < 200.0) {
+          hit.hit = true;
+          hit.dist = tF;
+          hit.point = ray.origin + ray.direction * tF;
+          hit.normal = vec3(0.0, 1.0, 0.0);
+          hit.material = 2;
+        }
+      }
+    }
+
     // Travel segment through water: Beer attenuation (physical path length)
     if (inWater && hit.hit) {
       throughput *= volumeAttenuation(hit.dist, lambdaNm);
     } else if (inWater && !hit.hit) {
-      // Long free path in water before "infinity"
-      throughput *= volumeAttenuation(40.0, lambdaNm);
+      // Near-horizontal residual only (should be uncommon after closure)
+      throughput *= volumeAttenuation(12.0, lambdaNm);
     }
 
     if (!hit.hit) {
@@ -859,11 +946,16 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
         }
       }
     } else {
-      nextDir = normalize(refractDir(I, N_micro, eta));
-      if (length(nextDir) < 1e-6) {
-        // Microfacet TIR fallback → geometric reflect
+      // Do NOT normalize(0) — GLSL gives NaN → whole path blacks STILL average
+      vec3 Tm = refractDir(I, N_micro, eta);
+      if (dot(Tm, Tm) < 1e-12) {
+        Tm = refractDir(I, N_eff, eta);
+      }
+      if (dot(Tm, Tm) < 1e-12) {
         nextDir = normalize(I - 2.0 * dot(I, N_eff) * N_eff);
         chooseReflect = true;
+      } else {
+        nextDir = normalize(Tm);
       }
     }
 
@@ -871,13 +963,26 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
     if (!chooseReflect) inWater = !fromInside;
 
     // Dielectric spawn: offset along geometric normal into the medium we enter.
-    // waveNormal points to air (+). Air side = +N, water side = -N.
-    // Reflect air → air (+N); reflect water → water (-N);
-    // Transmit air→water → water (-N); transmit water→air → air (+N).
+    // waveNormal points to air (+). Snap so heightfield side matches intent
+    // (tilted N + eps can land in a trough/air pocket → medium desync → black path).
     bool enterAir = chooseReflect ? !fromInside : fromInside;
-    float eps = 0.002;
-    vec3 surfP = hit.point;
-    vec3 spawnPos = surfP + N * (enterAir ? eps : -eps);
+    float eps = 0.003;
+    vec3 spawnPos = hit.point + N * (enterAir ? eps : -eps);
+    for (int k = 0; k < 5; k++) {
+      bool below = isInWaterAt(spawnPos);
+      if (enterAir && !below) break;
+      if (!enterAir && below) break;
+      spawnPos += N * (enterAir ? eps : -eps);
+    }
+    // Prefer geometric side of the free surface after snap
+    inWater = isInWaterAt(spawnPos);
+    if (enterAir && inWater) {
+      spawnPos += N * (eps * 3.0);
+      inWater = false;
+    } else if (!enterAir && !inWater) {
+      spawnPos -= N * (eps * 3.0);
+      inWater = true;
+    }
 
     ray.origin = spawnPos;
     ray.direction = nextDir;
@@ -888,15 +993,15 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
       float legLen = 4.0;
       if (volumeScatterLeg(ray, legLen, lambdaNm, seed, bounce, throughput, accum, volRay)) {
         ray = volRay;
-        // Scatter stays in water medium
-        inWater = true;
+        inWater = isInWaterAt(ray.origin);
       }
     }
 
-    // Russian roulette after a few bounces (deeper trapped paths)
-    if (bounce >= 3) {
+    // Russian roulette after a few bounces — keep q floor higher so we don't
+    // kill barely-alive underwater paths into pure black samples as often.
+    if (bounce >= 4) {
       float lum = max(throughput.r, max(throughput.g, throughput.b));
-      float q = clamp(lum, 0.05, 0.95);
+      float q = clamp(lum, 0.15, 0.95);
       if (hash3(vec3(seed, float(bounce + 99))) > q) break;
       throughput /= q;
     }
@@ -983,13 +1088,21 @@ void main() {
     Ray primary;
     primary.origin = cameraPos;
     primary.direction = rd;
-    color += pathTrace(primary, pixel + jitter + float(s), lambdaNm);
+    vec3 sampleCol = pathTrace(primary, pixel + jitter + float(s), lambdaNm);
+    // Soft firefly clamp (production path tracers): kill rare huge spikes that
+    // make neighboring near-black samples look like "popping" holes in LIVE.
+    float peak = max(sampleCol.r, max(sampleCol.g, sampleCol.b));
+    if (peak > 8.0) sampleCol *= 8.0 / peak;
+    color += sampleCol;
   }
   color /= max(float(spp), 1.0);
 
   // LIVE (cameraInteracting / reset): current path-trace frame only — no history.
   // Blending mismatched wave/cube poses was the spotty ghosting bug.
-  // STILL: progressive Monte Carlo average 1/N so caustics, Snell, TIR converge cleanly.
+  // STILL: progressive Monte Carlo 1/N until maxAccumSamples, then *rolling* blend
+  // so each pixel keeps a sample lifetime (new path samples never fully freeze out).
+  // That matches the product need: Animate-off must not lock a black plate forever
+  // if early samples were dark; continuous refresh can wash them out once paths are valid.
   vec3 accumulated;
   if (cameraInteracting > 0.5 || resetAccum > 0.5) {
     accumulated = color;
@@ -997,8 +1110,15 @@ void main() {
     vec3 prev = texture2D(accumTexture, uv).rgb;
     float n = max(accumSampleCount, 0.0);
     float spp = max(samplesPerFrame, 1.0);
+    float cap = max(maxAccumSamples, 1.0);
     // Progressive MC: after n prior samples, fold in spp new ones with weight spp/(n+spp).
     float w = spp / (n + spp);
+    // Sample TTL / rolling: once at nominal budget, keep a floor weight so new
+    // path samples still replace a fraction of history (never fully stop).
+    if (n + 0.5 >= cap) {
+      float roll = max(temporalBlend, spp / cap);
+      w = max(w, roll);
+    }
     accumulated = mix(prev, color, clamp(w, 0.0, 1.0));
   }
 

@@ -189,6 +189,18 @@ export function setupUI(tracer: PathTracer): void {
 
   const setView = (underwater: boolean) => {
     tracer.setUnderwaterView(underwater);
+    // Above/Below framing is a science still — keep STILL (Animate off) so
+    // progressive path-trace can clean without LIVE motion thrash.
+    if (tracer.params.animateWaves) {
+      tracer.setAnimateScene(false);
+      const aw = document.getElementById('animate-waves') as HTMLInputElement | null;
+      if (aw) aw.checked = false;
+      const leg = document.getElementById('legend-animate') as HTMLInputElement | null;
+      if (leg) leg.checked = false;
+      const modeEl = document.getElementById('legend-mode');
+      if (modeEl) modeEl.textContent = 'STILL accumulate';
+      syncAutoOrbitButton(tracer);
+    }
     btnAbove.classList.toggle('active', !underwater);
     btnBelow.classList.toggle('active', underwater);
   };

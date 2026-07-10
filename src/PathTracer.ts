@@ -1799,12 +1799,13 @@ export class PathTracer {
     const readIdx = this.ping;
     const writeIdx = 1 - this.ping;
     const sampleInterval = 1000 / Math.max(1, this.params.sampleFps);
-    const atBudget =
-      !live && this.accumSampleCount >= this.params.maxAccumSamples && !this.needsReset;
-    // LIVE: sample every display frame for real-time path-trace feel.
-    // STILL: throttle by sampleFps until budget, then hold display.
+    // LIVE: every display frame (fresh path samples, no history).
+    // STILL: throttle by sampleFps but NEVER permanently stop sampling.
+    // Old behavior stopped at maxAccumSamples and *froze* the buffer — if early
+    // samples were black (false underwater misses), the image stayed black forever.
+    // Continuous STILL keeps a sample TTL / rolling blend after the nominal budget.
     const shouldSample =
-      !atBudget && (live || this.needsReset || now - this.lastSampleTime >= sampleInterval);
+      live || this.needsReset || now - this.lastSampleTime >= sampleInterval;
 
     if (shouldSample) {
       u.accumTexture.value = this.accumTargets[readIdx].texture;
@@ -1817,6 +1818,8 @@ export class PathTracer {
       this.lastSampleTime = now;
 
       if (!live) {
+        // Climb to maxAccumSamples for progressive 1/N, then stay at max so the
+        // shader switches to rolling blend (pixels keep receiving new path samples).
         this.accumSampleCount = Math.min(
           this.accumSampleCount + this.params.samplesPerFrame,
           this.params.maxAccumSamples,
@@ -1852,8 +1855,10 @@ export class PathTracer {
       return `LIVE path-trace · ${this.params.samplesPerFrame} spp · ${w}×${h} · ${ch} · uncheck Animate for clean accum`;
     }
     const pct = Math.min(100, Math.round((this.accumSampleCount / this.params.maxAccumSamples) * 100));
-    const done = this.accumSampleCount >= this.params.maxAccumSamples ? ' DONE' : '';
-    return `STILL accum ${this.accumSampleCount}/${this.params.maxAccumSamples} (${pct}%)${done} · ${w}×${h} · ${ch}`;
+    // After nominal budget we keep rolling (sample TTL) — not a frozen DONE plate.
+    const phase =
+      this.accumSampleCount >= this.params.maxAccumSamples ? ' rolling' : '';
+    return `STILL accum ${this.accumSampleCount}/${this.params.maxAccumSamples} (${pct}%)${phase} · ${w}×${h} · ${ch}`;
   }
 
   getGpuInfo(): string {
