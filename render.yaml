@@ -10,7 +10,7 @@
 #
 # Operator checklist:
 #   1. Dashboard → New → Blueprint → connect this repo (branch: main)
-#   2. Confirm service name oceanscape-web; plan free (or upgrade)
+#   2. Confirm service name oceanscape-web (static sites are free; no plan field)
 #   3. No Secret Files required (client-only sim; no API keys)
 #   4. Deploy → open https://<service>.onrender.com/
 #   5. Live smoke: intro → Enter → STILL ocean hero; Animate for LIVE; #chapter=ocean
@@ -19,12 +19,16 @@
 # Scaling: static sites are CDN-backed and diskless (no persistent disk).
 # Multi-instance web scaling does not apply; no attached disk needed.
 # Auto-deploy: commit to linked branch deploys (autoDeployTrigger: commit).
+#
+# Note: Do not set plan: free on type:web — Blueprint rejects it
+# ("no such plan free for service type web"). Static sites have no
+# instance plan; they are free via the Static Site product itself.
 
 services:
   - type: web
     name: oceanscape-web
     runtime: static
-    plan: free
+    # plan omitted: static sites are not free/starter instance types
     branch: main
     autoDeployTrigger: commit
     # Install + build only (no long-running process in build).
