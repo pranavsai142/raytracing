@@ -9,40 +9,34 @@ The real work is driven by:
 
 ## Current Big Picture
 
-**Production first-run UX + seafloor/waterline train landed** (2026-07-09). Next gate is **push + live Pages verify**.
+**Below-water bulk looks better; STILL still has angle-dependent black failure modes.**
 
-- Cold load: **Enter Oceanscape** intro → free-fly gated; underlay is STILL ocean hero.
-- Default: `animateWaves: false` (STILL accumulate); Controls open; other panels collapsed.
-- Fly: shared yaw/pitch (drag + WASD); A/D via `src/flyBasis.ts` (left/right of look).
-- Seafloor: parametric height/bump/pattern/material + presets; substrate only.
-- Water path: heightfield march + normal-offset dielectric spawn (no sky-while-underwater fudge).
-- Smoke: `npm run smoke` (auto-enters intro); `npm run test:strafe`.
+- Production UX: intro → Enter; default **Animate OFF** (STILL); controls legend; mobile menu.
+- STILL: progressive 1/N then **hold** at budget (rolling TTL **removed** — it poisoned averages).
+- **Open P0:** Snell overhead disk goes black after accum; above-water surface can still go black; ~1–5% black speckles. Same family: paths that should escape/hit instead die as near-black residual.
 
-**Canonical next docs:**  
-`2026-07-09-production-ux-physics-handoff.md`  
-`2026-07-09-northstar-visual-deploy-handoff.md` (ship checklist)
+**Canonical next doc:**  
+`notes/GROK/handoffs/2026-07-16-still-snell-black-spots-handoff.md`
 
 ## Hard-Won Lessons
 
 1. Never blend path-trace samples across changing waves/cube.
-2. Cube must be in frame or “physics” looks broken.
-3. Snell window needs FOV past critical angle to show dark TIR ring.
-4. False water miss / self-hit → STILL black streaks; fix geometry/medium, not paint.
+2. LIVE hides a black mean; STILL freezes it — fix paths, not “more refresh” alone.
+3. Post-budget rolling EMA with frozen RNG seed → surface goes black over time (do not reintroduce).
+4. Snell disk black = water→air escape failed (false miss / wrong medium), not “kill pixels.”
 5. One yaw for look + strafe or drag→WASD snaps.
-6. Physics demo ships before full Goethe REQ matrix.
 
 ## How We Work
 
-- `/init` · `/done` · `npm run build` · `npm run dev` · `npm run smoke` · `npm run test:strafe` · push → Actions Pages
+- `/init` · `/done` · `npm run build` · `npm run dev` · `npm run smoke` · `npm run test:strafe` · `npm run test:above-still`
 - API: `window.__oceanscape` (`entered`, `enterOceanscape`, freeze/animate, chapters)
-- Live URL target: https://pranavsai142.github.io/raytracing/
 
 ## Next Focus
 
-1. Commit dirty `pathTracer.frag.glsl` if still uncommitted; push `main`.
-2. Live checklist on Pages (intro → Enter → STILL → LIVE; A/D; mobile Menu).
-3. Optional PR-C: Snell button, mode badge, freeze key.
-4. Optional P2: floor reverse-NEE caustics; Goethe completeness.
+1. **P0** Fix STILL Snell window (overhead bright cone must survive DONE).
+2. **P0** Fix above-water surface black mean in STILL.
+3. **P1** Speckles + clean camera-move accum reset.
+4. Push / live Pages only after P0 honest.
 
 ---
 

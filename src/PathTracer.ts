@@ -661,15 +661,17 @@ export class PathTracer {
         this.params.sunElevation = 0.85;
         this.params.sunAzimuth = 0.35;
         this.params.sunIntensity = 1.55;
-        this.params.exposure = 1.5;
+        this.params.exposure = 1.55;
         this.params.volumeSigma = 0.03;
         this.params.interfaceRoughness = 0.02;
         this.params.waveAmplitude = 0.06;
         this.lookAtCubeUnderwater();
-        // Cube dominant mid-frame; surface strip above = Snell bright + TIR dark rim
-        this.cameraPos.set(0.3, -0.7, 3.35);
-        this.cameraTarget.set(0, this.params.cubeDepth + 0.35, 0);
-        this.params.fov = 58;
+        // Deeper eye + wider FOV: bright Snell cone MUST be in frame so STILL
+        // does not read as "the whole ocean surface went black" (TIR-only strip).
+        // Cube still mid-frame; look slightly up so critical-angle rim is visible.
+        this.cameraPos.set(0.15, -1.35, 3.2);
+        this.cameraTarget.set(0.0, this.params.cubeDepth + 1.1, 0.0);
+        this.params.fov = 72;
         break;
 
       case 'primordial':

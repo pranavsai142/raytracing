@@ -729,34 +729,59 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
     HitInfo hit = traceScene(ray);
     vec2 ru = rand2(seed + float(bounce) * 17.0);
 
-    // —— Domain closure (production): infinite ocean = surface + optional floor.
-    // Underwater rays that "miss" are almost always a false miss (intersection
-    // failure or near-horizontal path). Those used to terminate with near-black
-    // residual → speckles / black spots that pop each sample in LIVE/early STILL.
-    // Close the domain instead of inventing sky underwater.
+    // —— Domain closure: infinite ocean = free surface + optional floor.
+    // Underwater "miss" is almost always a false miss (heightfield / grazing).
+    // Those used to write underwaterMissRadiance (~black) and STILL averaged
+    // the surface into a solid black band. Close the domain — never leave an
+    // in-water ray with nowhere physical to go.
     if (!hit.hit && inWater) {
-      if (ray.direction.y > 1e-4) {
-        // Going up: must meet the free surface
+      float bestT = 1e20;
+      int bestMat = -1;
+      vec3 bestN = vec3(0.0, 1.0, 0.0);
+      vec3 bestP = ray.origin;
+
+      // Always try the free surface (even for slight downward rays — waves fold)
+      {
         float tS;
         vec3 nS;
         vec2 xzS;
-        if (intersectWaterSurface(ray.origin, ray.direction, tS, nS, xzS) && tS > 0.001) {
-          hit.hit = true;
-          hit.dist = tS;
-          hit.point = vec3(xzS.x, waveHeight(xzS, time), xzS.y);
-          hit.normal = nS;
-          hit.material = 0;
+        if (intersectWaterSurface(ray.origin, ray.direction, tS, nS, xzS) && tS > 0.001 && tS < bestT) {
+          bestT = tS;
+          bestMat = 0;
+          bestN = nS;
+          bestP = vec3(xzS.x, waveHeight(xzS, time), xzS.y);
         }
-      } else if (floorEnabled > 0.5 && ray.direction.y < -1e-4) {
-        // Going down: must meet the seafloor plane
+      }
+      // Floor for any downward component (incl. near-horizontal)
+      if (floorEnabled > 0.5 && ray.direction.y < -1e-5) {
         float tF = (floorHeight - ray.origin.y) / ray.direction.y;
-        if (tF > 0.001 && tF < 200.0) {
-          hit.hit = true;
-          hit.dist = tF;
-          hit.point = ray.origin + ray.direction * tF;
-          hit.normal = vec3(0.0, 1.0, 0.0);
-          hit.material = 2;
+        if (tF > 0.001 && tF < 200.0 && tF < bestT) {
+          bestT = tF;
+          bestMat = 2;
+          bestN = vec3(0.0, 1.0, 0.0);
+          bestP = ray.origin + ray.direction * tF;
         }
+      }
+      // Near-horizontal / still empty: project to nearest of floor plane or surface y
+      if (bestMat < 0 && floorEnabled > 0.5) {
+        float y = ray.origin.y;
+        float tF = abs(ray.direction.y) > 1e-5
+          ? (floorHeight - y) / ray.direction.y
+          : -1.0;
+        if (tF > 0.001 && tF < 200.0) {
+          bestT = tF;
+          bestMat = 2;
+          bestN = vec3(0.0, 1.0, 0.0);
+          bestP = ray.origin + ray.direction * tF;
+        }
+      }
+
+      if (bestMat >= 0) {
+        hit.hit = true;
+        hit.dist = bestT;
+        hit.point = bestP;
+        hit.normal = bestN;
+        hit.material = bestMat;
       }
     }
 
@@ -931,7 +956,10 @@ vec3 pathTrace(Ray primary, vec2 seed, float lambdaNm) {
     vec3 nextDir;
 
     if (chooseReflect) {
-      nextDir = normalize(I - 2.0 * dot(I, N_micro) * N_micro);
+      // Prefer geometric N for TIR / high-R so microfacet noise does not aim
+      // the ray back into the surface (energy thrash → black STILL surface).
+      vec3 Nr = (tir || reflectance > 0.85) ? N_eff : N_micro;
+      nextDir = normalize(I - 2.0 * dot(I, Nr) * Nr);
       // Reflect must leave into the incident medium hemisphere
       if (dot(nextDir, N_eff) < 0.0) {
         nextDir = normalize(I - 2.0 * dot(I, N_eff) * N_eff);
