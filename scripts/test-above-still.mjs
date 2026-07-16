@@ -59,38 +59,58 @@ try {
     a.setUnderwater(false); // ABOVE WATER
     a.setAnimateScene(false); // STILL — the failure mode
     a.tracer.params.samplesPerFrame = 2;
+    a.tracer.params.maxAccumSamples = 64; // hit budget quickly to test post-budget hold
     a.tracer.params.renderScale = 1;
     a.tracer.applyRenderScale();
+    a.tracer.markSceneChanged();
   });
 
   await page.waitForTimeout(400);
+  // Reach budget (64)
   const wait = await page.evaluate(async () =>
-    window.__oceanscape.waitForSamples(48, 45000),
+    window.__oceanscape.waitForSamples(64, 45000),
   );
-  const meta = await page.evaluate(() => ({
+  const midMeta = await page.evaluate(() => ({
     mode: window.__oceanscape.getMode(),
     animate: window.__oceanscape.tracer.params.animateWaves,
     under: window.__oceanscape.tracer.params.underwaterView,
     camY: window.__oceanscape.tracer.cameraPos.y,
     samples: window.__oceanscape.getSamples(),
+    stats: window.__oceanscape.getStats(),
   }));
+  const pngMid = path.join(OUT, 'above-still-at-budget.png');
+  await page.locator('#canvas').screenshot({ path: pngMid });
+  const lumMid = measure(pngMid);
+  log('At budget: ' + JSON.stringify({ midMeta, wait, lumMid }));
 
-  const png = path.join(OUT, 'above-still-48.png');
-  await page.locator('#canvas').screenshot({ path: png });
-  const lum = measure(png);
+  // Wait well past budget — old rolling-TTL bug pulled surface to black here
+  await page.waitForTimeout(5000);
+  const lateMeta = await page.evaluate(() => ({
+    samples: window.__oceanscape.getSamples(),
+    stats: window.__oceanscape.getStats(),
+    mode: window.__oceanscape.getMode(),
+  }));
+  const pngLate = path.join(OUT, 'above-still-after-hold.png');
+  await page.locator('#canvas').screenshot({ path: pngLate });
+  const lumLate = measure(pngLate);
+  log('After 5s hold past budget: ' + JSON.stringify({ lateMeta, lumLate }));
 
-  log('Above Water + Animate OFF (STILL)');
-  log(JSON.stringify({ meta, wait, lum }, null, 2));
-
-  // Contract: not black, animate off, camera above surface
+  // Contract: not black at budget OR after hold; samples stay at max (held, not poisoned)
+  const stable =
+    Math.abs(lumLate.meanY - lumMid.meanY) < 25 && // hold shouldn't crash toward black
+    lumLate.meanY > 40 &&
+    lumMid.meanY > 40;
   const ok =
-    meta.animate === false &&
-    meta.under === false &&
-    meta.camY > 0.5 &&
-    meta.mode === 'still' &&
-    lum.meanY > 40 &&
-    lum.darkFrac < 0.35 &&
-    lum.blackFrac < 0.15;
+    midMeta.animate === false &&
+    midMeta.under === false &&
+    midMeta.camY > 0.5 &&
+    midMeta.mode === 'still' &&
+    lateMeta.samples >= 64 &&
+    lumMid.darkFrac < 0.35 &&
+    lumLate.darkFrac < 0.35 &&
+    lumMid.blackFrac < 0.15 &&
+    lumLate.blackFrac < 0.15 &&
+    stable;
 
   log(ok ? 'OVERALL PASS' : 'OVERALL FAIL');
   await writeFile(path.join(OUT, 'REPORT.txt'), lines.join('\n') + '\n');

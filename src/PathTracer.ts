@@ -1799,13 +1799,18 @@ export class PathTracer {
     const readIdx = this.ping;
     const writeIdx = 1 - this.ping;
     const sampleInterval = 1000 / Math.max(1, this.params.sampleFps);
-    // LIVE: every display frame (fresh path samples, no history).
-    // STILL: throttle by sampleFps but NEVER permanently stop sampling.
-    // Old behavior stopped at maxAccumSamples and *froze* the buffer — if early
-    // samples were black (false underwater misses), the image stayed black forever.
-    // Continuous STILL keeps a sample TTL / rolling blend after the nominal budget.
+    // LIVE: sample every display frame (fresh path, no history).
+    // STILL: progressive 1/N until maxAccumSamples, then HOLD the average.
+    //
+    // Do NOT keep "rolling" after budget with a frozen seed: when n is stuck at
+    // max, RNG (driven by accumSampleCount) repeats the same sample every tick
+    // and EMA pulls the good progressive image toward that one dark realization
+    // → ocean surface goes black over time. Classical still path-tracers freeze
+    // the MC mean once enough unique samples are in.
+    const atBudget =
+      !live && this.accumSampleCount >= this.params.maxAccumSamples && !this.needsReset;
     const shouldSample =
-      live || this.needsReset || now - this.lastSampleTime >= sampleInterval;
+      !atBudget && (live || this.needsReset || now - this.lastSampleTime >= sampleInterval);
 
     if (shouldSample) {
       u.accumTexture.value = this.accumTargets[readIdx].texture;
@@ -1818,15 +1823,13 @@ export class PathTracer {
       this.lastSampleTime = now;
 
       if (!live) {
-        // Climb to maxAccumSamples for progressive 1/N, then stay at max so the
-        // shader switches to rolling blend (pixels keep receiving new path samples).
         this.accumSampleCount = Math.min(
           this.accumSampleCount + this.params.samplesPerFrame,
           this.params.maxAccumSamples,
         );
         this.needsReset = false;
       } else {
-        // Live path-trace: each frame stands alone; counter shows "1" for clarity.
+        // Live path-trace: each frame stands alone; counter shows spp for clarity.
         this.accumSampleCount = this.params.samplesPerFrame;
         this.needsReset = false;
       }
@@ -1855,10 +1858,8 @@ export class PathTracer {
       return `LIVE path-trace · ${this.params.samplesPerFrame} spp · ${w}×${h} · ${ch} · uncheck Animate for clean accum`;
     }
     const pct = Math.min(100, Math.round((this.accumSampleCount / this.params.maxAccumSamples) * 100));
-    // After nominal budget we keep rolling (sample TTL) — not a frozen DONE plate.
-    const phase =
-      this.accumSampleCount >= this.params.maxAccumSamples ? ' rolling' : '';
-    return `STILL accum ${this.accumSampleCount}/${this.params.maxAccumSamples} (${pct}%)${phase} · ${w}×${h} · ${ch}`;
+    const done = this.accumSampleCount >= this.params.maxAccumSamples ? ' DONE' : '';
+    return `STILL accum ${this.accumSampleCount}/${this.params.maxAccumSamples} (${pct}%)${done} · ${w}×${h} · ${ch}`;
   }
 
   getGpuInfo(): string {

@@ -1099,10 +1099,10 @@ void main() {
 
   // LIVE (cameraInteracting / reset): current path-trace frame only — no history.
   // Blending mismatched wave/cube poses was the spotty ghosting bug.
-  // STILL: progressive Monte Carlo 1/N until maxAccumSamples, then *rolling* blend
-  // so each pixel keeps a sample lifetime (new path samples never fully freeze out).
-  // That matches the product need: Animate-off must not lock a black plate forever
-  // if early samples were dark; continuous refresh can wash them out once paths are valid.
+  // STILL: progressive Monte Carlo average 1/N. CPU stops new samples at
+  // maxAccumSamples and *holds* the buffer (do not keep EMA-rolling with a
+  // frozen RNG seed — that pulled a good average toward one dark sample and
+  // made the ocean surface go black after ~budget time).
   vec3 accumulated;
   if (cameraInteracting > 0.5 || resetAccum > 0.5) {
     accumulated = color;
@@ -1110,15 +1110,8 @@ void main() {
     vec3 prev = texture2D(accumTexture, uv).rgb;
     float n = max(accumSampleCount, 0.0);
     float spp = max(samplesPerFrame, 1.0);
-    float cap = max(maxAccumSamples, 1.0);
     // Progressive MC: after n prior samples, fold in spp new ones with weight spp/(n+spp).
     float w = spp / (n + spp);
-    // Sample TTL / rolling: once at nominal budget, keep a floor weight so new
-    // path samples still replace a fraction of history (never fully stop).
-    if (n + 0.5 >= cap) {
-      float roll = max(temporalBlend, spp / cap);
-      w = max(w, roll);
-    }
     accumulated = mix(prev, color, clamp(w, 0.0, 1.0));
   }
 
