@@ -18,7 +18,7 @@ Deliver a **deployed**, interactive Three.js path tracer that demonstrates physi
 
 - Physics correctness is the primary test: does light trap underwater and only escape at the right angles?
 - The cube is sacred — preserve rotation, texturing, and submerged placement (default ~y=-2.2; always below the water plane).
-- LIVE path-trace never blends mismatched geometry; STILL freezes waves+cube then accumulates.
+- LIVE path-trace never blends mismatched geometry; STILL freezes waves+cube then accumulates (accum RT must be sampleable — float + nearest — or STILL reads black while LIVE still looks fine).
 - Prefer literal path tracing over raster approximations when they conflict.
 - Web deployment must work: build, smoke, deploy to GitHub Pages (`/raytracing/`).
 - Narrative handoffs capture physics decisions and validation.

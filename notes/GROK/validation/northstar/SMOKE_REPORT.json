@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-16T18:39:20.433Z",
+  "generatedAt": "2026-07-16T19:18:27.038Z",
   "baseUrl": "http://127.0.0.1:5173/raytracing/",
   "samplesTarget": 48,
   "northStar": "Reproduce light at the air–water interface: Fresnel, Snell, TIR trap/escape, caustics — simulation not faked shading.",

@@ -6,8 +6,8 @@ Path: setUnderwater(false) / lookAtCubeAbove → LIVE → setAnimateScene(false)
 
 | Setup | LIVE meanY | STILL late | ratio | blacked? |
 |-------|----------:|-----------:|------:|:--------:|
-| default-above | 108.4 | 111.2 | 1.03 | no |
-| horizon | 137.5 | 140.4 | 1.02 | no |
-| grazing | 144.4 | 147.8 | 1.02 | no |
+| default-above | 43.7 | 44.7 | 1.02 | no |
+| horizon | 50.8 | 51.4 | 1.01 | no |
+| grazing | 52.1 | 52.8 | 1.01 | no |
 
 PNGs: `notes/GROK/validation/still-blackout-above/`

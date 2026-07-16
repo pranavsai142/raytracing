@@ -400,18 +400,39 @@ export interface SimParams {
   afterimageDecay: number;
 }
 
+/**
+ * Accum buffer type for STILL progressive 1/N.
+ *
+ * CRITICAL (user-visible LIVE-ok / STILL-black):
+ * STILL samples the previous accum texture each frame; LIVE never does (reset every frame).
+ * HalfFloat + LinearFilter is not reliably sampleable on some Apple / Metal / ANGLE
+ * stacks — texture2D returns 0 → progressive mix pulls the frame to black while LIVE
+ * still looks fine. Prefer full float when color-renderable; always use NearestFilter
+ * (see createAccumTarget).
+ */
 function pickAccumType(renderer: THREE.WebGLRenderer): THREE.TextureDataType {
   const gl = renderer.getContext();
-  const isWebGL2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
-  if (isWebGL2) return THREE.HalfFloatType;
-  const ext = gl.getExtension('OES_texture_half_float');
-  return ext ? THREE.HalfFloatType : THREE.UnsignedByteType;
+  const isWebGL2 =
+    typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
+  if (isWebGL2) {
+    // WebGL2: prefer 32-bit float if we can render to it; else 16-bit half.
+    const colorBufferFloat = gl.getExtension('EXT_color_buffer_float');
+    if (colorBufferFloat) return THREE.FloatType;
+    return THREE.HalfFloatType;
+  }
+  const half = gl.getExtension('OES_texture_half_float');
+  const halfColor = gl.getExtension('EXT_color_buffer_half_float');
+  if (half && halfColor) return THREE.HalfFloatType;
+  return THREE.UnsignedByteType;
 }
 
 function createAccumTarget(w: number, h: number, type: THREE.TextureDataType): THREE.WebGLRenderTarget {
+  // NearestFilter is mandatory for STILL: progressive blend must read exact texels.
+  // LinearFilter on float/half-float RTs is optional (OES_texture_float_linear) and
+  // when unsupported yields black samples → STILL plate goes black.
   return new THREE.WebGLRenderTarget(w, h, {
-    minFilter: THREE.LinearFilter,
-    magFilter: THREE.LinearFilter,
+    minFilter: THREE.NearestFilter,
+    magFilter: THREE.NearestFilter,
     format: THREE.RGBAFormat,
     type,
     depthBuffer: false,
@@ -557,6 +578,13 @@ export class PathTracer {
 
     this.accumType = pickAccumType(this.renderer);
     this.accumTargets = [createAccumTarget(1, 1, this.accumType), createAccumTarget(1, 1, this.accumType)];
+    const accumLabel =
+      this.accumType === THREE.FloatType
+        ? 'float32+nearest'
+        : this.accumType === THREE.HalfFloatType
+          ? 'half+nearest'
+          : 'byte+nearest';
+    this.gpuInfo = `${this.gpuInfo} · accum=${accumLabel}`;
 
     this.material = new THREE.ShaderMaterial({
       vertexShader: vertShader,
@@ -1547,9 +1575,12 @@ export class PathTracer {
   }
 
   markSceneChanged(): void {
+    // Clear history so STILL does not blend mismatched geometry — but the next
+    // render must immediately path-trace a full frame (needsReset + lastSampleTime).
     this.clearAccumBuffers();
     this.accumSampleCount = 0;
     this.needsReset = true;
+    this.lastSampleTime = 0;
     this.ping = 0;
     this.cameraSettled = true;
     this.lastCamPos.copy(this.cameraPos);
@@ -1767,21 +1798,27 @@ export class PathTracer {
     const live = camMoving || sceneDynamic || !this.cameraSettled;
     this.renderMode = live ? 'live' : 'still';
 
+    // Motion: go LIVE without history. On first motion edge, clear once.
+    // Settle: enter STILL with resetAccum (seed from fresh path, not a black plate).
+    // Avoid stacking clears that flash black before the first STILL sample lands.
     if (camMoving) {
-      this.settleCooldown = 0.4;
+      this.settleCooldown = 0.35;
       if (this.cameraSettled) {
         this.clearAccumBuffers();
         this.cameraSettled = false;
         this.accumSampleCount = 0;
         this.needsReset = true;
       }
-    } else {
+    } else if (!this.cameraSettled) {
       this.settleCooldown -= dt;
-      if (!this.cameraSettled && this.settleCooldown <= 0) {
-        this.clearAccumBuffers();
+      if (this.settleCooldown <= 0) {
+        // Enter STILL: reset counters; first sample writes with resetAccum=1 (full path
+        // frame). Clearing both RTs here made a black frame if the next sample was
+        // delayed — and on broken float-filter GPUs, later progressive reads stayed 0.
         this.cameraSettled = true;
         this.accumSampleCount = 0;
         this.needsReset = true;
+        this.lastSampleTime = 0; // force shouldSample this frame
       }
     }
 

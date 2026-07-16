@@ -1,6 +1,6 @@
 # North-star visual smoke report
 
-Generated: 2026-07-16T18:39:20.433Z
+Generated: 2026-07-16T19:18:27.038Z
 Base URL: http://127.0.0.1:5173/raytracing/
 Still sample target: 48
 Pass: **YES**
