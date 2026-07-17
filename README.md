@@ -14,7 +14,7 @@ Literally reproduce light at the water surface:
 - **Caustics** and god rays from path-traced transport + volume scatter
 - Submerged **rotating checkerboard cube** as validation geometry
 
-Hero still (local smoke): `notes/GROK/validation/northstar/07-still-look-up-snell.png` — bright Snell cone, dark TIR ring, cube below.
+Hero still (local smoke): run `npm run smoke` — bright Snell cone, dark TIR ring, cube below. Captures land under `notes/GROK/validation/` (gitignored).
 
 ## LIVE vs STILL (critical)
 
